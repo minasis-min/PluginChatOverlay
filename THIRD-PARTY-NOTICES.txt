@@ -8,7 +8,7 @@ Original author attribution retained: Copyright (c) 2026, min.
 
 The original PluginChatOverlay code, build scripts and documentation,
 the embedded MinasisUI 0.1.8 code authored by min, and the plugin icon are
-licensed under BSD-3-Clause. See the accompanying LICENSE for the full terms.
+licensed under MIT. See the accompanying LICENSE for the full terms.
 
 The distributed icon, images/icon.png, is
 covered by the same terms. Commercial use, modification and redistribution
@@ -21,7 +21,7 @@ Their respective licenses and rights remain applicable.
 External Components Provided by Dalamud
 --------------------------------------
 The following components are provided by the Dalamud host and are not
-bundled with this plugin. The BSD-3-Clause license for PluginChatOverlay
+bundled with this plugin. The MIT license for PluginChatOverlay
 does not replace or override their licenses.
 
 Dalamud

@@ -13,6 +13,19 @@ The supported Dalamud.dll SHA256 is `C726C1DE70B76A7ACC970F48E29589CD61205F08DAE
 
 Build references: Dalamud, Dalamud.Bindings.ImGui, FFXIVClientStructs, InteropGenerator.Runtime, Lumina, Lumina.Excel, Newtonsoft.Json. Tests additionally use the host's Mono.Cecil and cimgui.dll. The SDK must include their runtime dependencies to execute checks.
 
-MinasisUI's exact file hashes are recorded in `vendor/MinasisUI/0.1.8/origin.json` and verified before building. Its original LICENSE is retained. No independent MinasisUI DLL is required. No Demo, Preview or reference projects are distributed.
+MinasisUI's exact file hashes are recorded in `vendor/MinasisUI/0.1.8/origin.json` and verified before building. Its copyright notices are retained; this project copy is licensed under MIT by its copyright holder. No independent MinasisUI DLL is required. No Demo, Preview or reference projects are distributed.
 
-External component licenses and attribution are listed in THIRD-PARTY-NOTICES.txt. PluginChatOverlay's BSD license covers its original code and assets; it does not relicense the host or game resources.
+External component licenses and attribution are listed in THIRD-PARTY-NOTICES.txt. PluginChatOverlay's MIT license covers its original code and assets; it does not relicense the host or game resources.
+
+## ビルド・配布ZIPの作成
+
+PowerShell 7と上記の.NET SDKを用意し、対応するDalamud SDKのファイルを `.dependencies/Dalamud-15.0.3.6/` に配置します。リポジトリのルートで実行してください。
+
+```powershell
+pwsh -NoProfile -File ./scripts/build.ps1
+pwsh -NoProfile -File ./scripts/package.ps1
+```
+
+公開用ソースでは配布モードが既定です。成果物は `artifacts/`、一時ファイルは `.work/` に生成し、Gitには登録しません。ZIPには本体DLL、manifest、deps.json、アイコン、LICENSE、THIRD-PARTY-NOTICES.txtを含めます。
+
+対象ゲーム版は FFXIV 2026.09.15.0000.0000 です。公開後のカスタムリポジトリ経由のインストール確認と、1.0.1のゲーム内動作確認は開発時のビルド・自動チェックとは別です。
