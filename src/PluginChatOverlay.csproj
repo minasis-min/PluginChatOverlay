@@ -6,7 +6,6 @@
     <Reference Include="Dalamud;Dalamud.Bindings.ImGui;FFXIVClientStructs;InteropGenerator.Runtime;Lumina;Lumina.Excel;Newtonsoft.Json"><HintPath>$(DalamudLibPath)/%(Identity).dll</HintPath><Private>false</Private></Reference>
     <None Include="../images/icon.png" Link="images/icon.png" CopyToOutputDirectory="PreserveNewest" />
     <None Include="../LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
-    <None Include="../THIRD-PARTY-NOTICES.txt" Link="THIRD-PARTY-NOTICES.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Update="PluginChatOverlay.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

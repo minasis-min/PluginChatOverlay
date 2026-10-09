@@ -53,7 +53,6 @@ $taskAllowed = [ordered]@{
     'PluginChatOverlay.deps.json' = Join-Path $taskBinary 'PluginChatOverlay.deps.json'
     'images/icon.png' = Join-Path $ProjectRoot 'images/icon.png'
     'LICENSE' = Join-Path $ProjectRoot 'LICENSE'
-    'THIRD-PARTY-NOTICES.txt' = Join-Path $ProjectRoot 'THIRD-PARTY-NOTICES.txt'
 }
 $taskZip = Join-Path $taskDirectory 'PluginChatOverlay.zip'
 if (Test-Path -LiteralPath $taskZip) { throw 'Existing package retained; use a new version or a clean output directory' }

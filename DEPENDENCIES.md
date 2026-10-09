@@ -15,7 +15,7 @@ Build references: Dalamud, Dalamud.Bindings.ImGui, FFXIVClientStructs, InteropGe
 
 MinasisUI's exact file hashes are recorded in `vendor/MinasisUI/0.1.8/origin.json` and verified before building. Its copyright notices are retained; this project copy is licensed under MIT by its copyright holder. No independent MinasisUI DLL is required. No Demo, Preview or reference projects are distributed.
 
-External component licenses and attribution are listed in THIRD-PARTY-NOTICES.txt. PluginChatOverlay's MIT license covers its original code and assets; it does not relicense the host or game resources.
+External component licenses and attribution are listed below. PluginChatOverlay's MIT license covers its original code and assets; it does not relicense the host or game resources.
 
 ## ビルド・配布ZIPの作成
 
@@ -26,6 +26,42 @@ pwsh -NoProfile -File ./scripts/build.ps1
 pwsh -NoProfile -File ./scripts/package.ps1
 ```
 
-公開用ソースでは配布モードが既定です。成果物は `artifacts/`、一時ファイルは `.work/` に生成し、Gitには登録しません。ZIPには本体DLL、manifest、deps.json、アイコン、LICENSE、THIRD-PARTY-NOTICES.txtを含めます。
+公開用ソースでは配布モードが既定です。成果物は `artifacts/`、一時ファイルは `.work/` に生成し、Gitには登録しません。ZIPには本体DLL、manifest、deps.json、アイコン、LICENSEを含めます。
 
 対象ゲーム版は FFXIV 2026.09.15.0000.0000 です。公開後のカスタムリポジトリ経由のインストール確認と、1.0.1のゲーム内動作確認は開発時のビルド・自動チェックとは別です。
+
+## External component licenses
+
+External Components Provided by Dalamud
+--------------------------------------
+The following components are provided by the Dalamud host and are not
+bundled with this plugin. The MIT license for PluginChatOverlay
+does not replace or override their licenses.
+
+Dalamud
+License: AGPL-3.0
+https://github.com/goatcorp/Dalamud/blob/b666d821a47306fb447c60155b5d99377f91a5ee/LICENSE
+
+FFXIVClientStructs
+Copyright (c) 2021-2023 aers.
+License: MIT
+https://github.com/aers/FFXIVClientStructs/blob/313161e448e335adddd928f8a0212b2c328b5659/LICENSE
+
+Lumina
+License: WTFPL-2.0
+https://github.com/NotAdam/Lumina/blob/master/LICENSE
+
+Newtonsoft.Json
+Copyright (c) 2007 James Newton-King.
+License: MIT
+https://github.com/JamesNK/Newtonsoft.Json/blob/master/LICENSE.md
+
+Dear ImGui
+Copyright (c) 2014-2026 Omar Cornut.
+License: MIT
+https://github.com/ocornut/imgui/blob/master/LICENSE.txt
+
+Dalamud also provides the API bindings, native libraries,
+InteropGenerator.Runtime and icon fonts used by this plugin. These are
+not bundled with this plugin; their original licenses and notices remain
+applicable.
