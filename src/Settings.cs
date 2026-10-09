@@ -17,7 +17,7 @@ internal sealed class Settings
     [JsonIgnore] public float LineHeightRatio => 1f + LineSpacing / FontSize;
     public bool ShowTime { get; set; } = true;
     public uint TimestampColor { get; set; } = 0xFFFFFFFF;
-    public int HistoryLimit { get; set; } = 1000;
+    public int HistoryLimit { get; set; } = History.DefaultRecords;
     public bool CopyOnDragRelease { get; set; }
     public bool ShowWindowTitle { get; set; } = true;
     public bool ShowTabs { get; set; } = true;

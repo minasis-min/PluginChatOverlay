@@ -88,7 +88,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0: 初回安定版。タブ・独立窓・フォント・行間調整・コピー・ゲーム標準アイテムツールチップ。'
+$taskEntry.Changelog = '1.0.1: 説明を更新。コマンドを/pcoverlay、設定名をプラグイン通知分離に変更。履歴の既定100件、注意文を削除。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"

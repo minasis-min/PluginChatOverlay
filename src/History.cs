@@ -12,6 +12,7 @@ internal sealed class History
 {
     public const int MaxRecordBytes = 64 * 1024;
     public const int MaxRecords = 1000;
+    public const int DefaultRecords = 100;
     public const int MaxHistoryBytes = 16 * 1024 * 1024;
     private readonly object gate = new();
     private readonly List<ChatRecord> records = [];
@@ -20,7 +21,7 @@ internal sealed class History
     private ChatRecord[]? cachedSnapshot;
     private long removalRevision;
     public long RemovalRevision { get { lock (gate) return removalRevision; } }
-    public int Limit { get; set; } = 1000;
+    public int Limit { get; set; } = DefaultRecords;
     public long Evictions { get; private set; }
 
     public bool TryAdd(Func<long, ChatRecord> factory, out long id)

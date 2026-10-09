@@ -7,7 +7,7 @@ namespace PluginChatOverlay;
 
 public sealed partial class Plugin : IDalamudPlugin
 {
-    private const string Command = "/pluginchatoverlay";
+    private const string Command = "/pcoverlay";
     private readonly IDalamudPluginInterface pi;
     private readonly ICommandManager commands;
     private readonly IChatGui chat;

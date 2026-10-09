@@ -24,6 +24,7 @@ for(var i=0;i<10000;i++) if(!Probe.Queue()) throw new Exception("tiered stack pr
 Console.WriteLine($"PASS 10000 tiered queue calls: {clock.Elapsed.TotalMilliseconds:F1} ms (synthetic, not in-game)");
 
 var history = new History();
+history.ApplyLimit(History.MaxRecords);
 ChatRecord Record(long id, int size = 1) => new(id, 56, 0, 0, 0, [], new byte[size], "owned");
 var cacheHistory = new History();
 cacheHistory.TryAdd(id => Record(id), out var cacheId);

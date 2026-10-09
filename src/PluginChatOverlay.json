@@ -1,16 +1,16 @@
 {
   "Name": "Plugin Chat Overlay",
   "InternalName": "PluginChatOverlay",
-  "AssemblyVersion": "1.0.0.0",
+  "AssemblyVersion": "1.0.1.0",
   "DalamudApiLevel": 15,
-  "Punchline": "プラグインのチャット通知を専用ウィンドウに表示",
-  "Description": "標準Print系のプラグイン通知と入手ログへの一部追記を専用チャットへ分離します。タブ分け、独立ウィンドウ、フォント・行間調整、文章選択とコピー、ゲーム標準アイテムツールチップに対応。/pluginchatoverlay config で設定。分離は初期OFFです。",
+  "Punchline": "プラグイン通知をタブ分け可能な専用オーバーレイウィンドウに分離します。",
+  "Description": "プラグイン通知をタブ分け可能な専用オーバーレイウィンドウに分離します。\n分離は初期OFFです。",
   "ApplicableVersion": "2026.09.15.0000.0000",
   "Tags": [
     "chat",
     "overlay"
   ],
   "Author": "min",
-  "IconUrl": "https://github.com/minasis-min/PluginChatOverlay/releases/download/v1.0.0.0/icon.png",
+  "IconUrl": "https://github.com/minasis-min/PluginChatOverlay/releases/download/v1.0.1.0/icon.png",
   "RepoUrl": "https://github.com/minasis-min/PluginChatOverlay"
 }

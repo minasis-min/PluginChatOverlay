@@ -75,6 +75,12 @@ internal static class PresentationChecks
         Check(LootAppend.Split(62, incoming, [..incoming, ..lootExtra], out var extracted) && extracted.SequenceEqual(lootExtra), "mixed acquisition log splits exact appended set notice including item link while original stays intact");
         Check(!LootAppend.Split(10, incoming, [..incoming, ..lootExtra], out _) && !LootAppend.Split(62, incoming, incoming, out _) && !LootAppend.Split(62, incoming, [1, ..incoming, ..lootExtra], out _) && !LootAppend.Split(62, [], lootExtra, out _), "ordinary chat, unchanged loot and non-prefix rewrites are never split");
         var defaults = new Settings();
+        var previousHistorySettings = JsonSerializer.Deserialize<Settings>("{\"HistoryLimit\":1000}")!;
+        previousHistorySettings.Normalize();
+        Check(defaults.HistoryLimit == 100 && new History().Limit == 100,
+            "new settings and history default to 100 records");
+        Check(JsonSerializer.Deserialize<Settings>("{}")!.HistoryLimit == 100 && previousHistorySettings.HistoryLimit == 1000,
+            "missing history limit uses 100 while explicit previous limit is preserved");
         Check(ChatRowGeometry.Advance(17, 17, 4) == 21, "zero spacing preserves distance between chat records");
         Check(ChatRowGeometry.Advance(12, 12, 4) == 16, "negative spacing reduces single-line chat record distance");
         Check(ChatRowGeometry.Advance(24, 12, 4) == 28, "negative spacing preserves measured wrapped chat height");

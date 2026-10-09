@@ -29,7 +29,7 @@ public sealed partial class Plugin
         if (!minasisFrame) changed |= DrawUiStyleSettings();
         else UiSection("チャットの表示");
         var enabled = settings.Enabled;
-        if (UiCheckbox("分離機能", ref enabled)) { settings.Enabled = enabled; changed = true; }
+        if (UiCheckbox("プラグイン通知分離", ref enabled)) { settings.Enabled = enabled; changed = true; }
         var visible = settings.Visible;
         if (UiCheckbox("チャット窓を表示", ref visible)) { settings.Visible = visible; changed = true; }
         var title = settings.ShowWindowTitle;
@@ -157,7 +157,6 @@ public sealed partial class Plugin
         UiSection("履歴の保持・コピー");
         var changed = false; var limit = settings.HistoryLimit;
         if (UiInputInt("履歴件数 (10–1000)", ref limit)) { settings.HistoryLimit = Math.Clamp(limit, 10, History.MaxRecords); history.ApplyLimit(settings.HistoryLimit); PruneHistoryCaches(); changed = true; }
-        ImGui.TextWrapped("履歴件数を増やすとメモリ使用量とログ一覧の走査・色変更・折り返し再計算の負荷が増え、表示や操作が重くなる場合があります。まずは既定の1,000件を推奨します。履歴はメモリのみで、ファイルからの読込は行いません。");
         if (UiButton("履歴全体をコピー")) ImGui.SetClipboardText(string.Join(Environment.NewLine, history.Snapshot().Select(Plain)));
         if (UiButton("履歴をクリア")) { history.Clear(); PruneHistoryCaches(); foreach (var view in views.Values) { view.Selection.Clear(); view.Unread = 0; view.Follow = true; } }
         return changed;
