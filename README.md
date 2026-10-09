@@ -6,7 +6,7 @@ Dalamudプラグインのチャット通知を専用ウィンドウに表示し�
 
 Dalamud設定のカスタムプラグインリポジトリへ、次のURLを追加してください。
 
-`https://raw.githubusercontent.com/minasis-min/DalamudPlugins/refs/heads/main/pluginmaster.json`
+`https://raw.githubusercontent.com/minasis-min/DalamudPlugins/main/pluginmaster.json`
 
 プラグイン一覧から **Plugin Chat Overlay** をインストールします。公式Dalamudリポジトリへの登録は行っていません。開発版を使っていた場合は、先に無効化して二重読み込みを避けてください。
 
