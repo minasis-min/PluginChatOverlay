@@ -87,7 +87,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.2: Ctrl+Cコピーの無効設定を追加。ネイティブツールチップ解放失敗時の再試行を追加。MinasisUIを0.1.10へ更新。'
+$taskEntry.Changelog = '1.0.3: ゲームのチャット欄に表示・設定ショートカットを追加。各ウィンドウを個別に表示切替可能。時刻色の白リセットを維持。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"
