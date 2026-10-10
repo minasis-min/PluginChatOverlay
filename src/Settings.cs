@@ -10,6 +10,7 @@ internal sealed class Settings
     public OverlayUiStyle UiStyle { get; set; } = OverlayUiStyle.Dalamud;
     public bool Enabled { get; set; } // Initial opt-in for this unverified development build.
     public bool Visible { get; set; } = true;
+    public bool MainWindowVisible { get; set; } = true;
     public float BackgroundAlpha { get; set; } = .8f;
     public float FontSize { get; set; } = 17;
     public int LineSpacing { get; set; }
@@ -79,6 +80,25 @@ internal sealed class Settings
         windowId == "main" ? !t.Detached && t.ParentWindowId.Length == 0 :
         t.Detached && t.Id == windowId || !t.Detached && t.ParentWindowId == windowId);
     public string WindowOf(ChatTab tab) => tab.Detached ? tab.Id : tab.ParentWindowId.Length > 0 ? tab.ParentWindowId : "main";
+    public bool IsWindowVisible(string id) => Visible && (id == "main"
+        ? MainWindowVisible && WindowTabs("main").Any()
+        : Tabs.Any(t => t.Detached && t.Id == id && t.Visible));
+    public bool ToggleWindowVisibility(string id)
+    {
+        var tab = id == "main" ? null : Tabs.FirstOrDefault(t => t.Detached && t.Id == id);
+        if (id == "main" ? !WindowTabs("main").Any() : tab == null) return false;
+        var wasVisible = IsWindowVisible(id);
+        if (!Visible)
+        {
+            // Restore only the chosen window; all others were effectively hidden.
+            MainWindowVisible = false;
+            foreach (var root in Tabs.Where(t => t.Detached)) root.Visible = false;
+            Visible = true;
+        }
+        if (id == "main") MainWindowVisible = !wasVisible;
+        else tab!.Visible = !wasVisible;
+        return true;
+    }
     public void ResetGeometry()
     {
         X = 80; Y = 120; Width = 650; Height = 360;
@@ -89,6 +109,7 @@ internal sealed class Settings
         if (destination == tab.Id) return;
         if (destination != "main" && !Tabs.Any(t => t.Detached && t.Id == destination)) destination = "main";
         if (destination != "main") Tabs.First(t => t.Id == destination).Visible = true;
+        else MainWindowVisible = true;
         foreach (var child in Tabs.Where(t => !t.Detached && t.ParentWindowId == tab.Id))
             child.ParentWindowId = destination == "main" ? "" : destination;
         tab.Detached = false; tab.ParentWindowId = destination == "main" ? "" : destination;

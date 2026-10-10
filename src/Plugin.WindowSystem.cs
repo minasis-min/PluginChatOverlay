@@ -21,16 +21,14 @@ public sealed partial class Plugin
             if (tab.Detached && !windowModels.ContainsKey(tab.Id)) AddChatWindow(tab.Id, tab);
         foreach (var window in windowModels.Values)
         {
-            window.RequestedOpen = settings.Visible && (window.Tab == null
-                ? settings.WindowTabs("main").Any()
-                : window.Tab.Detached && window.Tab.Visible);
+            window.RequestedOpen = settings.IsWindowVisible(window.Tab?.Id ?? "main");
             window.IsOpen = window.RequestedOpen;
         }
         chatWindows.Draw();
         var changed = false;
         foreach (var window in windowModels.Values.Where(w => w.RequestedOpen && !w.IsOpen))
         {
-            if (window.Tab == null) settings.Visible = false; else window.Tab.Visible = false;
+            if (window.Tab == null) settings.MainWindowVisible = false; else window.Tab.Visible = false;
             changed = true;
         }
         if (changed) Save();

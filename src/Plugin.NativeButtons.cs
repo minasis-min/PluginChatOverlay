@@ -83,22 +83,14 @@ public sealed partial class Plugin
     private List<NativeWindowChoice> NativeWindows()
     {
         var windows = new List<NativeWindowChoice>();
-        if (settings.WindowTabs("main").Any()) windows.Add(new("main", "メイン###native-main", settings.Visible));
+        if (settings.WindowTabs("main").Any()) windows.Add(new("main", "メイン###native-main", settings.IsWindowVisible("main")));
         foreach (var tab in settings.Tabs)
-            if (tab.Detached) windows.Add(new(tab.Id, tab.Name + "###native-" + tab.Id, settings.Visible && tab.Visible));
+            if (tab.Detached) windows.Add(new(tab.Id, tab.Name + "###native-" + tab.Id, settings.IsWindowVisible(tab.Id)));
         return windows;
     }
     private void ToggleNativeWindow(string id)
     {
-        if (id == "main") settings.Visible = !settings.Visible;
-        else
-        {
-            var tab = settings.Tabs.FirstOrDefault(t => t.Id == id);
-            if (tab == null) return;
-            if (settings.Visible && tab.Visible) tab.Visible = false;
-            else { tab.Visible = true; settings.Visible = true; }
-        }
-        Save();
+        if (settings.ToggleWindowVisibility(id)) Save();
     }
     private bool DrawNativeButtonSettings()
     {

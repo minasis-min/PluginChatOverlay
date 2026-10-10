@@ -96,6 +96,8 @@ public sealed partial class Plugin
         if (UiCheckbox("時刻表示", ref time)) { settings.ShowTime = time; changed = true; }
         var rgba = ImGui.ColorConvertU32ToFloat4(settings.TimestampColor); var rgb = new Vector3(rgba.X, rgba.Y, rgba.Z);
         if (ImGui.ColorEdit3("時刻の色", ref rgb)) { settings.TimestampColor = ImGui.ColorConvertFloat4ToU32(new(rgb, 1)); changed = true; }
+        ImGui.SameLine();
+        if (UiButton("Default（白）")) { settings.TimestampColor = 0xFFFFFFFF; changed = true; }
         ImGui.TextWrapped("本文はゲームのチャット種別の色と、出力プラグインが指定した部分色をそのまま使用します。");
         if (palette.MissingKinds.Count > 0) ImGui.TextWrapped("標準色を取得できなかった種別: " + string.Join(", ", palette.MissingKinds));
         changed |= DrawNativeButtonSettings();

@@ -102,7 +102,7 @@ public sealed partial class Plugin : IDalamudPlugin
         }
     }
     private ChatTab? PrimaryWindowTab => settings.WindowOf(settings.Tabs[0]) is var id && id != "main" ? settings.Tabs.FirstOrDefault(t => t.Id == id) : null;
-    private void OpenMain() { settings.Visible = true; if (PrimaryWindowTab is { } root) root.Visible = true; Save(); }
+    private void OpenMain() { settings.Visible = true; if (PrimaryWindowTab is { } root) root.Visible = true; else settings.MainWindowVisible = true; Save(); }
     private void Save()
     {
         try { store.Save(settings); saveNotice = ""; }

@@ -179,8 +179,7 @@ public sealed partial class Plugin
             if (settings.SnapWindows && state.Window is { } rect)
             {
                 var viewport = ImGui.GetMainViewport();
-                var targets = views.Where(p => p.Key != id && p.Value.Window != null &&
-                    (p.Key == "main" && settings.Visible || settings.Tabs.Any(t => t.Id == p.Key && t.Detached && t.Visible)))
+                var targets = views.Where(p => p.Key != id && p.Value.Window != null && settings.IsWindowVisible(p.Key))
                     .Select(p => p.Value.Window!.Value);
                 pos = WindowSnap.Position(new(pos.X, pos.Y, rect.Width, rect.Height),
                     new(viewport.WorkPos.X, viewport.WorkPos.Y, viewport.WorkSize.X, viewport.WorkSize.Y), targets, settings.SnapDistance);
