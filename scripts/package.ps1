@@ -87,7 +87,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.1: 説明を更新。コマンドを/pcoverlay、設定名をプラグイン通知分離に変更。履歴の既定100件、注意文を削除。'
+$taskEntry.Changelog = '1.0.2: Ctrl+Cコピーの無効設定を追加。ネイティブツールチップ解放失敗時の再試行を追加。MinasisUIを0.1.10へ更新。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"

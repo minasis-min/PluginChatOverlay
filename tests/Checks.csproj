@@ -2,7 +2,7 @@
   <PropertyGroup><OutputType>Exe</OutputType><AllowUnsafeBlocks>true</AllowUnsafeBlocks></PropertyGroup>
   <ItemGroup>
     <Compile Include="../src/*.cs" Link="Source/%(Filename)%(Extension)" />
-    <Compile Include="../vendor/MinasisUI/0.1.8/*.cs" Link="MinasisUI/%(Filename)%(Extension)" />
+    <Compile Include="../vendor/MinasisUI/0.1.10/*.cs" Link="MinasisUI/%(Filename)%(Extension)" />
     <None Include="../.dependencies/Dalamud-15.0.3.6/cimgui.dll" Link="cimgui.dll" CopyToOutputDirectory="PreserveNewest" />
     <Reference Include="Dalamud;Dalamud.Bindings.ImGui;FFXIVClientStructs;InteropGenerator.Runtime;Lumina;Lumina.Excel;Newtonsoft.Json"><HintPath>$(MSBuildThisFileDirectory)../.dependencies/Dalamud-15.0.3.6/%(Identity).dll</HintPath></Reference>
     <Reference Include="Mono.Cecil"><HintPath>$(MSBuildThisFileDirectory)../.dependencies/Dalamud-15.0.3.6/Mono.Cecil.dll</HintPath></Reference>

@@ -7,6 +7,7 @@ namespace PluginChatOverlay;
 public sealed partial class Plugin
 {
     private readonly Ui ui = new();
+    private UiHeadingFonts? headingFonts;
     private bool minasisFrame;
     private uint originalChatColor;
     private static readonly UiChoice[] UiStyles = [new("dalamud", "Dalamud標準"), new("minasis", "MinasisUI")];

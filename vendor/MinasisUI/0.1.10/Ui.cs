@@ -12,6 +12,8 @@ public sealed class Ui : IDisposable
     private ImGuiListClipperPtr clipper;
     private bool hasClipper, disposed;
     public UiTheme Theme { get; set; } = UiTheme.SoftCharcoal;
+    /// <summary>Host-provided native font scope; Ui never owns or destroys its fonts.</summary>
+    public Func<bool, IDisposable>? HeadingFontScope { get; set; }
     public UiDimensions Dimensions { get; set; } = new();
     /// <summary>Total dimension scale: Dalamud global scale × optional local preview scale.</summary>
     public float Scale { get; set; } = 1;
@@ -38,8 +40,13 @@ public sealed class Ui : IDisposable
     private static string Label(string text) => text + "###control";
     public void Heading(string text, bool large = true)
     {
-        // Use the host's font at its native size: stretching atlas glyphs blurs headings.
-        ImGui.TextWrapped(text);
+        // Push a separately baked font instead of stretching atlas glyphs.
+        using (HeadingFontScope?.Invoke(large))
+        {
+            var position = ImGui.GetCursorScreenPos();
+            ImGui.SetCursorScreenPos(new Vector2(MathF.Round(position.X), MathF.Round(position.Y)));
+            ImGui.TextWrapped(text);
+        }
         if (large) ImGui.Separator();
     }
     public void Text(string text) => ImGui.TextWrapped(text);
@@ -191,17 +198,84 @@ public sealed class Ui : IDisposable
         finally { ImGui.PopStyleColor(); }
         ShadeItem(SurfaceKind.Inset); return changed;
     }
-    public bool InputInt(string id, string label, ref int value, bool enabled = true)
+    // Preserve the original signatures for already compiled consumers.
+    public bool InputInt(string id, string label, ref int value, bool enabled = true) => InputInt(id, label, ref value, 1, enabled, int.MinValue, int.MaxValue);
+    public bool InputFloat(string id, string label, ref float value, bool enabled = true) => InputFloat(id, label, ref value, .1f, enabled, -float.MaxValue, float.MaxValue, "%.2f");
+    /// <summary>Numeric entry followed by separate minus/plus buttons. Limits apply to entry and steps.</summary>
+    public bool InputInt(string id, string label, ref int value, int step, bool enabled = true, int min = int.MinValue, int max = int.MaxValue)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(step);
+        if (min > max) throw new ArgumentException("min must not exceed max.");
         using var c = new ControlScope(id, enabled);
         LabelAbove(label);
-        return ImGui.InputInt("###control", ref value);
+        var sizes = StepSizes();
+        ImGui.BeginGroup();
+        try
+        {
+            ImGui.SetNextItemWidth(sizes.Input);
+            var entered = value;
+            var changed = ImGui.InputInt("###control", ref entered, 0, 0, "%d", ImGuiInputTextFlags.AutoSelectAll);
+            if (changed) value = Math.Clamp(entered, min, max);
+            ShadeItem(SurfaceKind.Inset);
+            ImGui.SameLine(0, sizes.Gap);
+            if (Button("decrease", "-", enabled: value > min, width: sizes.Button / Scale))
+            { value = (int)Math.Clamp((long)value - step, min, max); changed = true; }
+            ImGui.SameLine(0, sizes.Gap);
+            if (Button("increase", "+", enabled: value < max, width: sizes.Button / Scale))
+            { value = (int)Math.Clamp((long)value + step, min, max); changed = true; }
+            return changed;
+        }
+        finally { ImGui.EndGroup(); }
     }
-    public bool InputFloat(string id, string label, ref float value, bool enabled = true)
+    public bool InputFloat(string id, string label, ref float value, float step, bool enabled = true,
+        float min = -float.MaxValue, float max = float.MaxValue, string format = "%.2f")
     {
+        if (!float.IsFinite(step) || step <= 0) throw new ArgumentOutOfRangeException(nameof(step));
+        if (!float.IsFinite(min) || !float.IsFinite(max) || min > max) throw new ArgumentException("Invalid numeric range.");
         using var c = new ControlScope(id, enabled);
         LabelAbove(label);
-        return ImGui.InputFloat("###control", ref value, .1f, 1, "%.2f");
+        var sizes = StepSizes();
+        ImGui.BeginGroup();
+        try
+        {
+            ImGui.SetNextItemWidth(sizes.Input);
+            var entered = value;
+            var changed = ImGui.InputFloat("###control", ref entered, 0, 0, format, ImGuiInputTextFlags.AutoSelectAll) && float.IsFinite(entered);
+            if (changed) value = Math.Clamp(entered, min, max);
+            ShadeItem(SurfaceKind.Inset);
+            ImGui.SameLine(0, sizes.Gap);
+            if (Button("decrease", "-", enabled: value > min, width: sizes.Button / Scale))
+            { value = (float)Math.Clamp((double)value - step, min, max); changed = true; }
+            ImGui.SameLine(0, sizes.Gap);
+            if (Button("increase", "+", enabled: value < max, width: sizes.Button / Scale))
+            { value = (float)Math.Clamp((double)value + step, min, max); changed = true; }
+            return changed;
+        }
+        finally { ImGui.EndGroup(); }
+    }
+    private (float Input, float Button, float Gap) StepSizes()
+    {
+        var width = Math.Max(1, ImGui.CalcItemWidth());
+        var gap = Math.Min(Metrics.Spacing.X, width / 12);
+        var button = Math.Min(ImGui.GetFrameHeight(), (width - gap * 2) / 3);
+        return (Math.Max(1, width - button * 2 - gap * 2), button, gap);
+    }
+    /// <summary>Shared sidebar hierarchy: plugin name, divider, optional version, divider.</summary>
+    public void SidebarHeader(string pluginName, string? version = null)
+    {
+        Heading(pluginName);
+        if (!string.IsNullOrEmpty(version)) { Muted(version); Separator(); }
+    }
+    private static readonly UiChoice[] StyleChoices = [new("minasis", "MinasisUI"), new("dalamud", "Dalamud標準UI")];
+    /// <summary>Call after navigation rows. Returns a selection; the host applies and persists its UI mode.</summary>
+    public bool UiStyleSelector(string id, ref bool useMinasisUI)
+    {
+        Separator();
+        ImGui.SetNextItemWidth(-1);
+        var selected = useMinasisUI ? 0 : 1;
+        if (!Dropdown(id, "UI", ref selected, StyleChoices)) return false;
+        useMinasisUI = selected == 0;
+        return true;
     }
     public bool Slider(string id, string label, ref float value, float min = 0, float max = 100, string format = "%.2f%%", bool enabled = true)
     {
@@ -553,6 +627,7 @@ public sealed class Ui : IDisposable
     {
         if (disposed) return;
         disposed = true;
+        HeadingFontScope = null;
         if (hasClipper) { clipper.Destroy(); hasClipper = false; }
     }
 }

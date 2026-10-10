@@ -9,7 +9,7 @@
 3. `/pcoverlay config` →「基本」→「プラグイン通知分離」を有効にします。
 
 ```text
-https://raw.githubusercontent.com/minasis-min/DalamudPlugins/main/pluginmaster.json
+https://raw.githubusercontent.com/minasis-min/Minasis-Dalamud-Plugins/main/pluginmaster.json
 ```
 
 ## 主な機能

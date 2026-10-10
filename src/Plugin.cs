@@ -61,6 +61,8 @@ public sealed partial class Plugin : IDalamudPlugin
         palette = new(data, log);
         try
         {
+            headingFonts = new(pi.UiBuilder.FontAtlas);
+            headingFonts.Apply(ui);
             ApplyUiVisibility();
             RebuildChatFont();
             commandRegistered = commands.AddHandler(Command, new CommandInfo(OnCommand) { HelpMessage = "Plugin Chat Overlay: show / config / on / off / reset / test" });
@@ -167,6 +169,7 @@ public sealed partial class Plugin : IDalamudPlugin
             () => chatFont?.Dispose(),
             () => fontAtlas?.Dispose(),
             () => ui.Dispose(),
+            () => headingFonts?.Dispose(),
             () => { if (commandRegistered) { commands.RemoveHandler(Command); commandRegistered = false; } },
             () => { if (testLinkActive) chat.RemoveChatLinkHandler(701); },
             () => { if (geometryDirtyAt != 0) Save(); },
