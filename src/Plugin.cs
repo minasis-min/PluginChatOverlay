@@ -40,8 +40,6 @@ public sealed partial class Plugin : IDalamudPlugin
     private bool commandRegistered;
     private long testLinkClicks;
     private volatile bool pluginsChanged = true;
-    private bool maskedLoaded;
-    private string maskedVersion = "";
 
     public Plugin(IDalamudPluginInterface pi, ICommandManager commands, IChatGui chat,
         IFramework framework, IGameGui game, IDataManager data, IKeyState keyState, IClientState clientState, IPluginLog log,
@@ -59,7 +57,7 @@ public sealed partial class Plugin : IDalamudPlugin
         try { settings = store.Load(); }
         catch (Exception ex) { settings = new(); saveNotice = "設定読込失敗。既定値で起動しました。"; log.Error(ex, "Settings load failed"); }
         history.ApplyLimit(settings.HistoryLimit);
-        links = new(chat, game, log);
+        links = new(chat, game, log, framework);
         palette = new(data, log);
         try
         {
@@ -88,8 +86,6 @@ public sealed partial class Plugin : IDalamudPlugin
         foreach (var plugin in installed) pluginNames[plugin.InternalName] = plugin.Name;
         tags.Reset(pluginNames.Select(p => (p.Key, p.Value)));
         presentationRevision++;
-        var masked = installed.FirstOrDefault(p => p.InternalName == "MaskedDalamud" && p.IsLoaded);
-        maskedLoaded = masked != null; maskedVersion = masked?.Version.ToString() ?? "";
     }
     private void OpenConfig() => configOpen = true;
     private void StopWindowDrags()

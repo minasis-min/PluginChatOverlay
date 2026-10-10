@@ -10,16 +10,16 @@ internal static class PresentationChecks
     public static void Run()
     {
         var tags = new PluginTags();
-        tags.Reset([("WeaponGlamour", "Weapon Glamour"), ("MaskedDalamud", "Masked Dalamud")]);
+        tags.Reset([("WeaponGlamour", "Weapon Glamour"), ("OtherPlugin", "Other Plugin")]);
         Check(tags.Resolve("WeaponGlamour: 一括適用が完了しました") == "WeaponGlamour", "exact colon name tag recognition");
-        Check(tags.Resolve("[Masked Dalamud] 日本語") == "MaskedDalamud", "exact display-name bracket recognition");
+        Check(tags.Resolve("[Other Plugin] 日本語") == "OtherPlugin", "exact display-name bracket recognition");
         Check(tags.Resolve("他のログ: WeaponGlamour: 一括") == "" && tags.Resolve("WeaponGlamourPlus: 他") == "", "body substring and similar name remain unclassified");
         tags.Reset([("A", "Duplicate"), ("B", "Duplicate")]);
         Check(tags.Resolve("[Duplicate] text") == "", "ambiguous tag remains unclassified");
         var tab = new ChatTab { IncludeUnknown = true, Plugins = ["WeaponGlamour"] };
-        Check(tab.Matches("") && tab.Matches("WeaponGlamour") && !tab.Matches("MaskedDalamud"), "tab partitions selected plugins and unknown");
+        Check(tab.Matches("") && tab.Matches("WeaponGlamour") && !tab.Matches("OtherPlugin"), "tab partitions selected plugins and unknown");
         tab.IncludeAll = true;
-        Check(tab.Matches("MaskedDalamud") && tab.Matches(""), "all tab includes unknown and named logs");
+        Check(tab.Matches("OtherPlugin") && tab.Matches(""), "all tab includes unknown and named logs");
         var screen = new WindowRect(0, 0, 1920, 1080);
         Check(WindowSnap.Position(new(6, 300, 400, 300), screen, [], 16) == new Vector2(0, 300), "snap to screen left edge");
         Check(WindowSnap.Position(new(1509, 786, 400, 280), screen, [], 16) == new Vector2(1520, 800), "snap to screen right and bottom");
@@ -59,6 +59,15 @@ internal static class PresentationChecks
         displaySettings.TimestampColor = 0xFF112233;
         Check(new ReadOnlySeString(DisplayDocument.Content(displayRecord, displaySettings, prefix)).ToMacroString().StartsWith("<color(4281541137)>[23:34]<color(stackcolor)>"), "custom timestamp color converts RGBA to game BGRA without recoloring body");
         var copyInput = new CopyInput();
+        Check(new Settings().CopyWithCtrlC && JsonSerializer.Deserialize<Settings>("{\"FontSize\":21}")!.CopyWithCtrlC,
+            "new and legacy settings preserve Ctrl+C copy enabled by default");
+        var disabledCopy = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(new Settings { CopyWithCtrlC = false }))!;
+        disabledCopy.Normalize();
+        Check(!disabledCopy.CopyWithCtrlC, "disabled Ctrl+C copy persists through settings round trip and normalization");
+        var toggledCopy = new CopyInput();
+        toggledCopy.Suppress(true, true, true, new object()); toggledCopy.Reset();
+        Check(!toggledCopy.TakeRequest() && !toggledCopy.Suppress(false, true, true),
+            "disabling Ctrl+C drops pending copy and releases consumed chord without suppressing foreign focus");
         var copyContext = new object(); var contextCopy = new CopyInput();
         contextCopy.Suppress(true, true, true, copyContext);
         Check(contextCopy.TakeRequest(out var retainedContext) && ReferenceEquals(retainedContext, copyContext),

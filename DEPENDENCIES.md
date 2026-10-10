@@ -65,3 +65,5 @@ Dalamud also provides the API bindings, native libraries,
 InteropGenerator.Runtime and icon fonts used by this plugin. These are
 not bundled with this plugin; their original licenses and notices remain
 applicable.
+
+ゲーム内の併用確認項目は [TESTING.md](TESTING.md) を参照してください。

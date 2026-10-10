@@ -26,4 +26,5 @@ internal sealed class CopyInput
         }
     }
     public void CancelRequest() { lock (gate) { request = false; requestContext = null; } }
+    public void Reset() { lock (gate) { consumed = false; request = false; requestContext = null; } }
 }

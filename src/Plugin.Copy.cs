@@ -7,6 +7,7 @@ public sealed partial class Plugin
 {
     private void CompleteCopyRequest()
     {
+        if (!settings.CopyWithCtrlC) { copyInput.Reset(); return; }
         if (!copyInput.TakeRequest(out var requestedView)) return;
         if (!chatFocused || requestedView is not ViewState copyView || !ReferenceEquals(copyView, focusedView)) return;
         CopySelection(copyView, copyView.Documents);
@@ -20,6 +21,7 @@ public sealed partial class Plugin
     {
         if (disposed) return;
         PruneHistoryCaches();
+        if (!settings.CopyWithCtrlC) { copyInput.Reset(); return; }
         if (Environment.TickCount64 - Interlocked.Read(ref inputUpdatedAt) > 250)
         {
             copyInput.Suppress(false, keyState[0x11], keyState[0x43]);

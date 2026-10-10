@@ -19,6 +19,7 @@ internal sealed class Settings
     public uint TimestampColor { get; set; } = 0xFFFFFFFF;
     public int HistoryLimit { get; set; } = History.DefaultRecords;
     public bool CopyOnDragRelease { get; set; }
+    public bool CopyWithCtrlC { get; set; } = true;
     public bool ShowWindowTitle { get; set; } = true;
     public bool ShowTabs { get; set; } = true;
     public bool AllowMove { get; set; } = true;

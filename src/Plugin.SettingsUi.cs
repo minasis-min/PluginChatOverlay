@@ -52,19 +52,6 @@ public sealed partial class Plugin
     private void DrawDiagnostics()
     {
         ImGui.TextWrapped(capture.Status);
-        if (maskedLoaded)
-        {
-            ImGui.TextWrapped($"Masked Dalamud {maskedVersion}: 併用時は『他プラグインのシステムメッセージを非表示にする』をOFFにしてください。設定のON/OFFは自動判定していません。");
-            if (UiButton("Masked Dalamudの設定を開く"))
-            {
-                try
-                {
-                    var masked = pi.InstalledPlugins.FirstOrDefault(p => p.InternalName == "MaskedDalamud" && p.IsLoaded && p.HasConfigUi);
-                    if (masked != null) masked.OpenConfigUi(); else saveNotice = "Masked Dalamudの設定画面は現在利用できません。";
-                }
-                catch (Exception ex) { saveNotice = "Masked Dalamudの設定画面を開けませんでした。"; log.Warning(ex, "Cannot open Masked Dalamud config"); }
-            }
-        }
         ImGui.TextWrapped("他プラグインが先に非表示にしたログは捕捉しません。");
         if (uiFault)
         {
@@ -141,9 +128,16 @@ public sealed partial class Plugin
         }
         ImGui.TextWrapped("移動はタイトル（プラグイン名）とタブのドラッグだけです。ログ欄の空白はドラッグしても窓を移動しません。");
         UiSection("選択・コピー");
+        var ctrlCopy = settings.CopyWithCtrlC;
+        if (UiCheckbox("Ctrl+Cで選択した文章をコピー", ref ctrlCopy))
+        {
+            settings.CopyWithCtrlC = ctrlCopy;
+            if (!ctrlCopy) copyInput.Reset();
+            changed = true;
+        }
         var autoCopy = settings.CopyOnDragRelease;
         if (UiCheckbox("ドラッグで選択して離した時に自動コピー", ref autoCopy)) { settings.CopyOnDragRelease = autoCopy; changed = true; }
-        ImGui.TextWrapped("自動コピーは既定OFFです。Ctrl+Cでは選択をコピーして解除し、窓を非アクティブにします。アクティブ中のCtrl+Cはゲーム側へ渡しません。");
+        ImGui.TextWrapped("Ctrl+Cコピーは既定ONです。有効時は選択をコピーして解除し、窓を非アクティブにします。OFF時はゲーム・他プラグインのCtrl+Cを抑止しません。右クリックコピーと任意の自動コピーは引き続き利用できます。");
         UiSection("スナップ");
         var snap = settings.SnapWindows;
         if (UiCheckbox("画面端・他のチャット窓へスナップ", ref snap)) { settings.SnapWindows = snap; changed = true; }

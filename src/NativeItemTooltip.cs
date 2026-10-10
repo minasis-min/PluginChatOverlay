@@ -12,12 +12,29 @@ using System.Numerics;
 
 namespace PluginChatOverlay;
 
-internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : IItemTooltipBackend
+internal sealed unsafe class NativeItemTooltip : IItemTooltipBackend
 {
+    private readonly IGameGui game;
+    private readonly IPluginLog log;
+    private readonly IFramework framework;
+    private readonly TooltipCleanupRetry cleanupRetry;
+    private bool stopping, listenerRegistered, releaseRequested;
+    public NativeItemTooltip(IGameGui game, IPluginLog log, IFramework framework)
+    {
+        this.game = game; this.log = log; this.framework = framework;
+        cleanupRetry = new(TryCleanup,
+            (action, delay) => { _ = framework.RunOnTick(action, delay, 1); },
+            ex => log.Warning(ex, "Native tooltip cleanup deferred; retrying on framework ticks"));
+    }
     // Version-pinned client bindings; the standard tooltip manager owns item-detail state.
     private static readonly Guid SupportedModule = new("7fda2a82-4ca8-49d0-9687-4c8eac011509");
     private static bool Compatible => typeof(AgentItemDetail).Module.ModuleVersionId == SupportedModule;
-    public string Status { get; private set; } = Compatible ? "" : "ネイティブツールチップ: FFXIVClientStructsの版が未対応です。";
+    private string status = Compatible ? "" : "ネイティブツールチップ: FFXIVClientStructsの版が未対応です。";
+    public string Status
+    {
+        get => cleanupRetry.Pending ? "ネイティブツールチップの終了処理を再試行中です。完了するまで新しい表示を待機します。" : status;
+        private set => status = value;
+    }
     private IAddonLifecycle? lifecycle;
     private IGameConfig? config;
     private TooltipItem? shown;
@@ -29,32 +46,19 @@ internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : 
     public void Register(IAddonLifecycle lifecycle, IGameConfig config)
     {
         this.lifecycle = lifecycle; this.config = config;
+        listenerRegistered = true;
         lifecycle.RegisterListener(AddonEvent.PostUpdate, "ItemDetail", Move);
     }
     public void Unregister()
     {
-        try { lifecycle?.UnregisterListener(AddonEvent.PostUpdate, "ItemDetail", Move); }
-        finally
-        {
-            lifecycle = null; config = null; shown = null;
-            if (anchor != null)
-            {
-                var stage = AtkStage.Instance();
-                if (stage != null)
-                {
-                    ReleaseAnchor();
-                }
-                if (attached) throw new InvalidOperationException("Tooltip anchor remains registered; destruction deferred.");
-                // Destroy only after successful detachment; never leave a registered dangling node.
-                anchor->Destroy(true); anchor = null;
-            }
-        }
+        stopping = true; shown = null; releaseRequested = true;
+        RequestCleanup();
     }
     public void SetWindows(WindowRect[] rects, Vector2 viewportOrigin, Vector2 screenSize)
     {
         chatRects = rects.Select(r => new WindowRect(r.X - viewportOrigin.X, r.Y - viewportOrigin.Y, r.Width, r.Height)).ToArray();
         this.screenSize = screenSize; this.viewportOrigin = viewportOrigin;
-        if (anchor != null) PositionAnchor();
+        if (!stopping && !cleanupRetry.Pending && anchor != null) PositionAnchor();
     }
     private void Move(AddonEvent type, AddonArgs args)
     {
@@ -67,7 +71,7 @@ internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : 
     }
     private void MoveOwnedTooltip(AddonArgs args)
     {
-        if (!Compatible || !OwnsTooltip() || shown is not { } item || config == null
+        if (stopping || cleanupRetry.Pending || !Compatible || !OwnsTooltip() || shown is not { } item || config == null
             || !config.TryGet(UiControlOption.DetailTrackingType, out uint tracking) || tracking != 0) return;
         var agent = AgentItemDetail.Instance(); var addon = (AtkUnitBase*)args.Addon.Address;
         if (agent == null || addon == null || !addon->IsVisible || addon->WindowNode == null
@@ -109,10 +113,14 @@ internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : 
     }
     public bool Show(TooltipItem item)
     {
-        if (!Compatible || item.RawId == 0 || item.RawId > int.MaxValue) return false;
+        if (stopping || cleanupRetry.Pending || !Compatible || item.RawId == 0 || item.RawId > int.MaxValue) return false;
         try
         {
-            if (attached && shown == null) ReleaseAnchor();
+            if (attached && shown == null)
+            {
+                releaseRequested = true; RequestCleanup();
+                if (cleanupRetry.Pending) return false;
+            }
             var stage = AtkStage.Instance();
             var parent = (AtkUnitBase*)game.GetAddonByName("ChatLog", 1).Address;
             if (stage == null || parent == null) return false;
@@ -137,7 +145,7 @@ internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : 
             stage->TooltipManager.ShowTooltip(AtkTooltipType.Item, parentId, anchor, &args);
             if (!OwnsTooltip())
             {
-                ReleaseAnchor();
+                releaseRequested = true; RequestCleanup();
                 return false;
             }
             shown = item; Status = ""; return true;
@@ -145,7 +153,7 @@ internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : 
         catch (Exception ex)
         {
             shown = null;
-            Cleanup.Run(error => log.Warning(error, "Failed tooltip request cleanup failed"), ReleaseAnchor);
+            releaseRequested = true; RequestCleanup();
             Status = "ネイティブツールチップを表示できませんでした。";
             log.Warning(ex, "Native item tooltip request failed"); return false;
         }
@@ -153,18 +161,41 @@ internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : 
     public void Hide(TooltipItem item)
     {
         shown = null;
-        if (!Compatible || anchor == null) return;
+        if (anchor == null) return;
+        releaseRequested = true; RequestCleanup();
+    }
+    private void RequestCleanup() => cleanupRetry.Request(framework.IsInFrameworkUpdateThread);
+    private bool TryCleanup()
+    {
+        Exception? failure = null;
+        if (stopping && listenerRegistered)
+        {
+            try
+            {
+                lifecycle!.UnregisterListener(AddonEvent.PostUpdate, "ItemDetail", Move);
+                listenerRegistered = false; lifecycle = null; config = null;
+            }
+            catch (Exception ex) { failure = ex; }
+        }
+        var released = !releaseRequested;
         try
         {
-            ReleaseAnchor();
+            if (releaseRequested && ReleaseAnchor()) { releaseRequested = false; released = true; }
+            if (stopping && released && !listenerRegistered && anchor != null)
+            {
+                // Destroy only after detachment and listener removal both succeeded.
+                anchor->Destroy(true); anchor = null;
+            }
         }
-        catch (Exception ex) { log.Warning(ex, "Native item tooltip release failed"); }
+        catch (Exception ex) { failure ??= ex; }
+        if (failure != null) throw failure;
+        return released && (!stopping || !listenerRegistered && anchor == null);
     }
-    private void ReleaseAnchor()
+    private bool ReleaseAnchor()
     {
-        if (anchor == null || !attached) return;
+        if (anchor == null || !attached) return true;
         var stage = AtkStage.Instance();
-        if (stage == null) return;
+        if (stage == null) return false;
         try { if (OwnsTooltip()) stage->TooltipManager.HideTooltip(parentId); }
         finally
         {
@@ -172,5 +203,6 @@ internal sealed unsafe class NativeItemTooltip(IGameGui game, IPluginLog log) : 
             // Keep the flag set if detachment fails so a later attempt can retry.
             stage->TooltipManager.DetachTooltip(anchor); attached = false;
         }
+        return true;
     }
 }

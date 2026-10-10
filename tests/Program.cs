@@ -106,7 +106,7 @@ var fakeGame=DispatchProxy.Create<IGameGui,ServiceProxy>();
 var mapCalls=0;
 ((ServiceProxy)(object)fakeGame).Result=(method,_)=> { if(method.Name=="OpenMapWithMapLink") { mapCalls++; return true; } return null; };
 var fakeLog=DispatchProxy.Create<IPluginLog,ServiceProxy>();
-var links=new Links(fakeChat,fakeGame,fakeLog);
+var links=new Links(fakeChat,fakeGame,fakeLog,DispatchProxy.Create<IFramework,ServiceProxy>());
 links.Activate(pluginBytes,0);
 Check(calls==1 && links.Notice.Length==0,"plugin callback gets original command id, extras and exact link message (stub handler)");
 registry.Clear();
@@ -119,7 +119,9 @@ links.Activate(firstLink,0);
 Check(mapCalls==1 && links.Notice.Length==0,"map payload routed to public API (stub game)");
 
 PresentationChecks.Run();
+CopyShortcutChecks.Run();
 TooltipChecks.Run();
+TooltipCleanupChecks.Run();
 SettingsStoreChecks.Run();
 CleanupChecks.Run();
 CaptureBoundaryChecks.Run();

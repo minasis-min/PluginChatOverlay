@@ -4,9 +4,9 @@ using Dalamud.Plugin.Services;
 
 namespace PluginChatOverlay;
 
-internal sealed class Links(IChatGui chat, IGameGui game, IPluginLog log)
+internal sealed class Links(IChatGui chat, IGameGui game, IPluginLog log, IFramework framework)
 {
-    private readonly NativeItemTooltip native = new(game, log);
+    private readonly NativeItemTooltip native = new(game, log, framework);
     private TooltipHover? hover;
     private TooltipHover Hover => hover ??= new(native);
     public string TooltipStatus => native.Status;
