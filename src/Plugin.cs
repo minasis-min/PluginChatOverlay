@@ -15,6 +15,7 @@ public sealed partial class Plugin : IDalamudPlugin
     private readonly IFramework framework;
     private readonly IKeyState keyState;
     private readonly IClientState clientState;
+    private readonly IGameGui game;
     private readonly CopyInput copyInput = new();
     private volatile bool chatFocused, controlDown, copyKeyDown;
     private long inputUpdatedAt;
@@ -47,7 +48,7 @@ public sealed partial class Plugin : IDalamudPlugin
     {
         this.pi = pi; this.commands = commands; this.chat = chat; this.log = log;
         this.framework = framework; this.keyState = keyState;
-        this.clientState = clientState;
+        this.clientState = clientState; this.game = game;
         var assemblyDirectory = pi.AssemblyLocation.DirectoryName ?? throw new IOException("DLL配置先不明");
 #if DISTRIBUTION
         store = SettingsStore.ForDistribution(pi.ConfigDirectory.FullName, assemblyDirectory);
@@ -126,6 +127,7 @@ public sealed partial class Plugin : IDalamudPlugin
             RefreshPlugins();
             UpdateFontChooser();
             using var selectedTheme = BeginUiTheme();
+            DrawNativeChatButtons();
             using (chatFont?.Push())
                 if (!uiFault && settings.Visible && (!settings.HideLoggedOut || clientState.IsLoggedIn) && (!settings.HideDuringCutscene || !pi.UiBuilder.CutsceneActive)) DrawChatWindows();
             if (configOpen) DrawConfig();

@@ -27,6 +27,9 @@ internal sealed class Settings
     public bool HideDuringCutscene { get; set; } = true;
     public bool HideLoggedOut { get; set; } = true;
     public bool LinkTooltips { get; set; } = true;
+    public bool ShowNativeButtons { get; set; } = true;
+    public float NativeButtonScale { get; set; } = 1;
+    public float NativeButtonFontSize { get; set; } = 14;
     public string FontIdType { get; set; } = "";
     public string FontIdJson { get; set; } = "";
     public bool Pinned { get; set; }
@@ -49,6 +52,8 @@ internal sealed class Settings
         HistoryLimit = Math.Clamp(HistoryLimit, 10, History.MaxRecords);
         TimestampColor |= 0xFF000000;
         SnapDistance = float.IsFinite(SnapDistance) ? Math.Clamp(SnapDistance, 4, 40) : 16;
+        NativeButtonScale = float.IsFinite(NativeButtonScale) ? Math.Clamp(NativeButtonScale, .5f, 2f) : 1f;
+        NativeButtonFontSize = float.IsFinite(NativeButtonFontSize) ? Math.Clamp(MathF.Round(NativeButtonFontSize), 8, 32) : 14;
         Tabs ??= [];
         Tabs = Tabs.Where(t => t != null).Take(8).ToList();
         if (Tabs.Count == 0) Tabs.Add(new() { Id = "all", Name = "タブ1", IncludeAll = true, Detached = true });
