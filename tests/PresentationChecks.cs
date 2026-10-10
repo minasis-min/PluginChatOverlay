@@ -174,7 +174,7 @@ internal static class PresentationChecks
         var nativeSaved = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(nativeButtons))!;
         nativeSaved.Normalize();
         Check(!nativeSaved.ShowNativeButtons && nativeSaved.NativeButtonScale == 2 && nativeSaved.NativeButtonFontSize == 32
-            && new Settings().ShowNativeButtons && new Settings().NativeButtonScale == 1 && new Settings().NativeButtonFontSize == 14, "native chat button visibility and size persist");
+            && new Settings().ShowNativeButtons && new Settings().NativeButtonScale == 1 && new Settings().NativeButtonFontSize == 18, "native chat button visibility and size persist");
         Check(defaults.Tabs.Single().Name == "タブ1" && !defaults.CopyOnDragRelease, "first tab and optional drag auto-copy defaults");
         defaults.Tabs[0].Name = "すべて"; defaults.Normalize();
         Check(defaults.Tabs[0].Name == "タブ1", "old untouched first tab migrates to tab 1");

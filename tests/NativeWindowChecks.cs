@@ -7,6 +7,32 @@ internal static class NativeWindowChecks
 {
     public static void Run()
     {
+        foreach (var uiScale in new[] { 1f, 1.5f, 2f })
+        {
+            var anchor = new WindowRect(100, 80, 24 * uiScale, 24 * uiScale);
+            var origin = new System.Numerics.Vector2(300, 200);
+            var layout = NativeButtonLayout.Create(anchor, origin, 1, 18, uiScale);
+            Check(layout.Position.X == origin.X + anchor.X + anchor.Width + 8 * uiScale
+                && layout.Height >= layout.FontSize + 8 * uiScale && layout.FontSize == 18 * uiScale,
+                $"native shortcut at {uiScale} scale clears scaled anchor and fits label");
+            var shifted = NativeButtonLayout.Create(anchor, origin, 1, 18, uiScale, new(10, -7));
+            Check(shifted.Position == layout.Position + new System.Numerics.Vector2(10, -7)
+                && shifted.Height == layout.Height && shifted.FontSize == layout.FontSize,
+                $"native offsets remain physical pixels at {uiScale} scale without changing button size");
+        }
+        var offsets = new Settings { NativeButtonOffsetX = -24, NativeButtonOffsetY = 8 };
+        var offsetSaved = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(offsets))!;
+        offsetSaved.Normalize();
+        Check(offsetSaved.NativeButtonOffsetX == -24 && offsetSaved.NativeButtonOffsetY == 8
+            && JsonSerializer.Deserialize<Settings>("{}")!.NativeButtonOffsetX == 0,
+            "native offsets persist and legacy settings retain the automatic position");
+        offsets.NativeButtonOffsetX = int.MinValue; offsets.NativeButtonOffsetY = int.MaxValue; offsets.Normalize();
+        Check(offsets.NativeButtonOffsetX == -2000 && offsets.NativeButtonOffsetY == 2000,
+            "native offsets normalize out-of-range settings safely");
+        var savedFont = JsonSerializer.Deserialize<Settings>("{\"NativeButtonFontSize\":14}")!;
+        savedFont.Normalize();
+        Check(savedFont.NativeButtonFontSize == 14 && new Settings().NativeButtonFontSize == 18,
+            "native shortcut retains saved text size while new default is larger");
         var settings = new Settings { Tabs = [
             new() { Id = "main-tab", Detached = false },
             new() { Id = "a", Detached = true, Visible = true },

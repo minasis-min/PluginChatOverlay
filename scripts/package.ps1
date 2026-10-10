@@ -87,7 +87,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.3: ゲームのチャット欄に表示・設定ショートカットを追加。各ウィンドウを個別に表示切替可能。時刻色の白リセットを維持。'
+$taskEntry.Changelog = '1.0.4: ショートカットボタンの配置と文字サイズを調整。横・縦の位置をpx単位で変更可能。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"

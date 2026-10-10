@@ -30,7 +30,9 @@ internal sealed class Settings
     public bool LinkTooltips { get; set; } = true;
     public bool ShowNativeButtons { get; set; } = true;
     public float NativeButtonScale { get; set; } = 1;
-    public float NativeButtonFontSize { get; set; } = 14;
+    public float NativeButtonFontSize { get; set; } = 18;
+    public int NativeButtonOffsetX { get; set; }
+    public int NativeButtonOffsetY { get; set; }
     public string FontIdType { get; set; } = "";
     public string FontIdJson { get; set; } = "";
     public bool Pinned { get; set; }
@@ -54,7 +56,9 @@ internal sealed class Settings
         TimestampColor |= 0xFF000000;
         SnapDistance = float.IsFinite(SnapDistance) ? Math.Clamp(SnapDistance, 4, 40) : 16;
         NativeButtonScale = float.IsFinite(NativeButtonScale) ? Math.Clamp(NativeButtonScale, .5f, 2f) : 1f;
-        NativeButtonFontSize = float.IsFinite(NativeButtonFontSize) ? Math.Clamp(MathF.Round(NativeButtonFontSize), 8, 32) : 14;
+        NativeButtonFontSize = float.IsFinite(NativeButtonFontSize) ? Math.Clamp(MathF.Round(NativeButtonFontSize), 8, 32) : 18;
+        NativeButtonOffsetX = Math.Clamp(NativeButtonOffsetX, -2000, 2000);
+        NativeButtonOffsetY = Math.Clamp(NativeButtonOffsetY, -2000, 2000);
         Tabs ??= [];
         Tabs = Tabs.Where(t => t != null).Take(8).ToList();
         if (Tabs.Count == 0) Tabs.Add(new() { Id = "all", Name = "タブ1", IncludeAll = true, Detached = true });

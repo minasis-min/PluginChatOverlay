@@ -1,6 +1,7 @@
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace PluginChatOverlay;
@@ -18,14 +19,17 @@ public sealed partial class Plugin
         if (addon == null || !addon->IsVisible) return;
         var node = addon->GetNodeById(ChatLogCloseNodeId);
         if (node == null || !node->IsVisible()) return;
-        var width = node->GetWidth() * node->ScaleX;
-        var height = node->GetHeight() * node->GetScaleY();
+        var scaleX = node->GetScaleX();
+        var scaleY = node->GetScaleY();
+        var width = node->GetWidth() * scaleX;
+        var height = node->GetHeight() * scaleY;
         if (width <= 0 || height <= 0) return;
-        var scale = settings.NativeButtonScale;
-        var buttonHeight = Math.Max(height * scale, settings.NativeButtonFontSize);
         var viewport = ImGui.GetMainViewport();
+        var layout = NativeButtonLayout.Create(new(node->ScreenX, node->ScreenY, width, height), viewport.Pos,
+            settings.NativeButtonScale, settings.NativeButtonFontSize, Math.Max(ImGuiHelpers.GlobalScale, scaleY),
+            new(settings.NativeButtonOffsetX, settings.NativeButtonOffsetY));
         ImGui.SetNextWindowViewport(viewport.ID);
-        ImGui.SetNextWindowPos(new(viewport.Pos.X + node->ScreenX + width + 4 * scale, viewport.Pos.Y + node->ScreenY + (height - buttonHeight) / 2), ImGuiCond.Always);
+        ImGui.SetNextWindowPos(layout.Position, ImGuiCond.Always);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
         ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0);
         var draw = ImGui.Begin("###PcoNativeChatButtons", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.AlwaysAutoResize
@@ -34,20 +38,21 @@ public sealed partial class Plugin
         try
         {
             if (!draw) return;
-            DrawNativeButtonRow(buttonHeight, scale);
+            DrawNativeButtonRow(layout);
             NativeWindowMenu();
         }
         finally { ImGui.End(); }
     }
-    private void DrawNativeButtonRow(float buttonHeight, float scale)
+    private void DrawNativeButtonRow(NativeButtonLayout layout)
     {
+        var buttonHeight = layout.Height;
         ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, buttonHeight * .5f);
         ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1);
-        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(6 * scale, 0));
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(4 * scale, 0));
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(layout.Padding, 0));
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(layout.Spacing, 0));
         try
         {
-            ImGui.SetWindowFontScale(NativeFontScale());
+            ImGui.SetWindowFontScale(NativeFontScale(layout.FontSize));
             var plugin = false;
             try { plugin = ImGui.Button("Plugin##PcoNativeChat", new(0, buttonHeight)); }
             finally { ImGui.SetWindowFontScale(1); }
@@ -62,7 +67,7 @@ public sealed partial class Plugin
             var gear = false;
             try
             {
-                ImGui.SetWindowFontScale(NativeFontScale());
+                ImGui.SetWindowFontScale(NativeFontScale(layout.FontSize));
                 gear = ImGui.Button(FontAwesomeIcon.Cog.ToIconString() + "##PcoNativeConfig", new(buttonHeight, buttonHeight));
             }
             finally { ImGui.SetWindowFontScale(1); ImGui.PopFont(); }
@@ -103,12 +108,30 @@ public sealed partial class Plugin
         var font = (int)MathF.Round(settings.NativeButtonFontSize);
         ImGui.SetNextItemWidth(180);
         if (UiInputInt("ボタンの文字サイズ (px)", ref font, 1, 4)) { settings.NativeButtonFontSize = Math.Clamp(font, 8, 32); changed = true; }
+        var x = settings.NativeButtonOffsetX;
+        if (NativeOffsetInput("native-offset-x", "横位置調整 (px)", ref x)) { settings.NativeButtonOffsetX = x; changed = true; }
+        var y = settings.NativeButtonOffsetY;
+        if (NativeOffsetInput("native-offset-y", "縦位置調整 (px)", ref y)) { settings.NativeButtonOffsetY = y; changed = true; }
+        if (UiButton("ボタン位置を標準に戻す"))
+        {
+            settings.NativeButtonOffsetX = settings.NativeButtonOffsetY = 0;
+            changed = true;
+        }
+        ImGui.TextWrapped("横は＋で右、−で左。縦は＋で下、−で上へ移動します。1px刻みで調整でき、UI倍率に関係なく指定したpx分だけ移動します。");
         return changed;
     }
-    private float NativeFontScale()
+    private bool NativeOffsetInput(string id, string label, ref int value)
+    {
+        ImGui.SetNextItemWidth(180 * ImGuiHelpers.GlobalScale);
+        var changed = minasisFrame ? ui.InputInt(id, label, ref value, 1, true, -2000, 2000)
+            : ImGui.InputInt(label, ref value, 1, 10);
+        if (changed) value = Math.Clamp(value, -2000, 2000);
+        return changed;
+    }
+    private static float NativeFontScale(float fontSize)
     {
         var size = ImGui.GetFontSize();
-        return size > 0 ? settings.NativeButtonFontSize / size : 1;
+        return size > 0 ? fontSize / size : 1;
     }
     private readonly record struct NativeWindowChoice(string Id, string Label, bool Open);
 }
