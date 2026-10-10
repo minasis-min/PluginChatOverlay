@@ -119,6 +119,7 @@ links.Activate(firstLink,0);
 Check(mapCalls==1 && links.Notice.Length==0,"map payload routed to public API (stub game)");
 
 PresentationChecks.Run();
+NativeWindowChecks.Run();
 CopyShortcutChecks.Run();
 TooltipChecks.Run();
 TooltipCleanupChecks.Run();

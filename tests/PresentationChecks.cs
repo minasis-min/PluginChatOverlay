@@ -169,6 +169,12 @@ internal static class PresentationChecks
         var visibilitySettings = new Settings { AllowMove = false, AllowResize = false, HideDuringCutscene = false, HideLoggedOut = false, LinkTooltips = false };
         var visibilitySaved = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(visibilitySettings))!;
         Check(!visibilitySaved.AllowMove && !visibilitySaved.AllowResize && !visibilitySaved.HideDuringCutscene && !visibilitySaved.HideLoggedOut && !visibilitySaved.LinkTooltips, "disabled movement, resizing, visibility and hover options persist");
+        var nativeButtons = new Settings { ShowNativeButtons = false, NativeButtonScale = 9, NativeButtonFontSize = 99 };
+        nativeButtons.Normalize();
+        var nativeSaved = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(nativeButtons))!;
+        nativeSaved.Normalize();
+        Check(!nativeSaved.ShowNativeButtons && nativeSaved.NativeButtonScale == 2 && nativeSaved.NativeButtonFontSize == 32
+            && new Settings().ShowNativeButtons && new Settings().NativeButtonScale == 1 && new Settings().NativeButtonFontSize == 14, "native chat button visibility and size persist");
         Check(defaults.Tabs.Single().Name == "タブ1" && !defaults.CopyOnDragRelease, "first tab and optional drag auto-copy defaults");
         defaults.Tabs[0].Name = "すべて"; defaults.Normalize();
         Check(defaults.Tabs[0].Name == "タブ1", "old untouched first tab migrates to tab 1");

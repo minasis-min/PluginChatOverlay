@@ -100,6 +100,7 @@ public sealed partial class Plugin
         if (UiButton("Default（白）")) { settings.TimestampColor = 0xFFFFFFFF; changed = true; }
         ImGui.TextWrapped("本文はゲームのチャット種別の色と、出力プラグインが指定した部分色をそのまま使用します。");
         if (palette.MissingKinds.Count > 0) ImGui.TextWrapped("標準色を取得できなかった種別: " + string.Join(", ", palette.MissingKinds));
+        changed |= DrawNativeButtonSettings();
         return changed;
     }
     private bool DrawInteraction()

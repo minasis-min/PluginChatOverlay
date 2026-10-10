@@ -15,6 +15,7 @@ public sealed partial class Plugin : IDalamudPlugin
     private readonly IFramework framework;
     private readonly IKeyState keyState;
     private readonly IClientState clientState;
+    private readonly IGameGui game;
     private readonly CopyInput copyInput = new();
     private volatile bool chatFocused, controlDown, copyKeyDown;
     private long inputUpdatedAt;
@@ -47,7 +48,7 @@ public sealed partial class Plugin : IDalamudPlugin
     {
         this.pi = pi; this.commands = commands; this.chat = chat; this.log = log;
         this.framework = framework; this.keyState = keyState;
-        this.clientState = clientState;
+        this.clientState = clientState; this.game = game;
         var assemblyDirectory = pi.AssemblyLocation.DirectoryName ?? throw new IOException("DLL配置先不明");
 #if DISTRIBUTION
         store = SettingsStore.ForDistribution(pi.ConfigDirectory.FullName, assemblyDirectory);
@@ -101,7 +102,7 @@ public sealed partial class Plugin : IDalamudPlugin
         }
     }
     private ChatTab? PrimaryWindowTab => settings.WindowOf(settings.Tabs[0]) is var id && id != "main" ? settings.Tabs.FirstOrDefault(t => t.Id == id) : null;
-    private void OpenMain() { settings.Visible = true; if (PrimaryWindowTab is { } root) root.Visible = true; Save(); }
+    private void OpenMain() { settings.Visible = true; if (PrimaryWindowTab is { } root) root.Visible = true; else settings.MainWindowVisible = true; Save(); }
     private void Save()
     {
         try { store.Save(settings); saveNotice = ""; }
@@ -126,6 +127,7 @@ public sealed partial class Plugin : IDalamudPlugin
             RefreshPlugins();
             UpdateFontChooser();
             using var selectedTheme = BeginUiTheme();
+            DrawNativeChatButtons();
             using (chatFont?.Push())
                 if (!uiFault && settings.Visible && (!settings.HideLoggedOut || clientState.IsLoggedIn) && (!settings.HideDuringCutscene || !pi.UiBuilder.CutsceneActive)) DrawChatWindows();
             if (configOpen) DrawConfig();
