@@ -9,6 +9,20 @@ public sealed partial class Plugin
     private DisplayDocument[] renderedDocuments = [];
     private readonly object renderCacheGate = new();
     private long prunedRemovalRevision = -1;
+    private void ClearHistory()
+    {
+        lock (renderCacheGate)
+        {
+            history.Clear();
+            PruneHistoryCaches();
+            copyInput.CancelRequest();
+            foreach (var state in views.Values)
+            {
+                state.Selection.Clear(); state.Unread = 0; state.Follow = true; state.Jump = true;
+                state.AnchorId = 0; state.AnchorOffset = 0; state.PreviousScroll = 0;
+            }
+        }
+    }
     private void PruneHistoryCaches()
     {
         lock (renderCacheGate)
@@ -21,6 +35,8 @@ public sealed partial class Plugin
             foreach (var state in views.Values)
             {
                 state.Documents = []; state.DocumentIds = []; state.ActiveIds = [];
+                state.RequestedScroll = null;
+                state.ScrollbarDragging = state.ScrollbarHovered = false; state.ScrollMaximum = 0;
                 state.DocumentIndices.Clear();
                 state.FilterSource = null; state.FilteredDocuments = []; state.UnreadDocuments = null;
                 foreach (var id in state.Rows.Keys.Where(id => !live.Contains(id)).ToArray()) state.Rows.Remove(id);

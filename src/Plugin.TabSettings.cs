@@ -8,7 +8,8 @@ public sealed partial class Plugin
     private string PluginName(string id) => pluginNames.TryGetValue(id, out var name) ? name : id;
     private bool DrawTabSettings()
     {
-        UiSection("タブ・ウィンドウ");
+        UiSection("タブ");
+        if (scrollChatTabSettings) { ImGui.SetScrollHereY(0); scrollChatTabSettings = false; }
         var changed = false;
         if (settings.Tabs.Count < 8 && UiButton("タブを追加"))
         {
@@ -28,6 +29,41 @@ public sealed partial class Plugin
         }
         var selected = settings.Tabs.First(t => t.Id == selectedSettingsTab);
         var name = selected.Name; if (UiInputText("タブ名", ref name, 48)) { selected.Name = string.IsNullOrWhiteSpace(name) ? "チャット" : name; changed = true; }
+        var all = selected.IncludeAll; if (UiCheckbox("すべてのプラグインを表示", ref all)) { selected.IncludeAll = all; changed = true; }
+        if (!selected.IncludeAll)
+        {
+            var unknown = selected.IncludeUnknown;
+            if (UiCheckbox("未分類ログを表示", ref unknown)) { selected.IncludeUnknown = unknown; changed = true; }
+            ImGui.TextUnformatted("表示するプラグイン（複数選択可）");
+            var child = ImGui.BeginChild("PluginChoices", new(Math.Min(ImGui.GetContentRegionAvail().X, 520 * ImGuiHelpers.GlobalScale), 190 * ImGuiHelpers.GlobalScale), true);
+            try
+            {
+                if (child) foreach (var plugin in pluginNames.Keys.Concat(recognised).Distinct().OrderBy(PluginName))
+                {
+                    var included = selected.Plugins.Contains(plugin);
+                    if (!UiCheckbox(PluginName(plugin) + "###include-" + plugin, ref included)) continue;
+                    if (included) selected.Plugins.Add(plugin); else selected.Plugins.Remove(plugin); changed = true;
+                }
+            }
+            finally { ImGui.EndChild(); }
+        }
+        ImGui.TextWrapped("ウィンドウ化・所属先・サイズは下の「個別ウィンドウ」で設定できます。タブの右クリックでもウィンドウ化できます。");
+        if (settings.Tabs.Count > 1 && UiButton("このタブを削除"))
+        {
+            var children = settings.Tabs.Where(t => t.ParentWindowId == selected.Id).ToArray();
+            settings.RemoveTab(selected);
+            foreach (var child in children) View(child.Id).ResetGeometry = true;
+            views.Remove(selected.Id); selectedSettingsTab = settings.Tabs[0].Id; changed = true;
+        }
+        changed |= DrawSelectedWindowSettings();
+        return changed;
+    }
+    private bool DrawSelectedWindowSettings()
+    {
+        UiSection("個別ウィンドウ");
+        var changed = false;
+        if (settings.Tabs.All(t => t.Id != selectedSettingsTab)) selectedSettingsTab = settings.Tabs[0].Id;
+        var selected = settings.Tabs.First(t => t.Id == selectedSettingsTab);
         var detached = selected.Detached;
         if (UiCheckbox("独立ウィンドウとして表示", ref detached))
         {
@@ -83,32 +119,6 @@ public sealed partial class Plugin
                 if (windowModels.TryGetValue(selected.Id, out var host)) { host.Collapsed = false; host.CollapsedCondition = ImGuiCond.Always; host.RequestFocus = true; }
                 changed = true;
             }
-        }
-        var all = selected.IncludeAll; if (UiCheckbox("すべてのプラグインを表示", ref all)) { selected.IncludeAll = all; changed = true; }
-        if (!selected.IncludeAll)
-        {
-            var unknown = selected.IncludeUnknown;
-            if (UiCheckbox("未分類ログを表示", ref unknown)) { selected.IncludeUnknown = unknown; changed = true; }
-            ImGui.TextUnformatted("表示するプラグイン（複数選択可）");
-            var child = ImGui.BeginChild("PluginChoices", new(Math.Min(ImGui.GetContentRegionAvail().X, 520 * ImGuiHelpers.GlobalScale), 190 * ImGuiHelpers.GlobalScale), true);
-            try
-            {
-                if (child) foreach (var plugin in pluginNames.Keys.Concat(recognised).Distinct().OrderBy(PluginName))
-                {
-                    var included = selected.Plugins.Contains(plugin);
-                    if (!UiCheckbox(PluginName(plugin) + "###include-" + plugin, ref included)) continue;
-                    if (included) selected.Plugins.Add(plugin); else selected.Plugins.Remove(plugin); changed = true;
-                }
-            }
-            finally { ImGui.EndChild(); }
-        }
-        ImGui.TextWrapped("タブの右クリックでもウィンドウ化できます。『所属ウィンドウ』でタブを別の窓へまとめられます。空の親ウィンドウは表示しません。移動後にマウスを離すと近い画面端・他のチャット窓へスナップします。");
-        if (settings.Tabs.Count > 1 && UiButton("このタブを削除"))
-        {
-            var children = settings.Tabs.Where(t => t.ParentWindowId == selected.Id).ToArray();
-            settings.RemoveTab(selected);
-            foreach (var child in children) View(child.Id).ResetGeometry = true;
-            views.Remove(selected.Id); selectedSettingsTab = settings.Tabs[0].Id; changed = true;
         }
         return changed;
     }

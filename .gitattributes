@@ -3,3 +3,4 @@
 vendor/MinasisUI/0.1.8/*.cs -text whitespace=trailing-space,space-before-tab,cr-at-eol
 
 vendor/MinasisUI/0.1.10/*.cs -text whitespace=trailing-space,space-before-tab,cr-at-eol
+vendor/MinasisUI/0.1.14/*.cs -text whitespace=trailing-space,space-before-tab,cr-at-eol

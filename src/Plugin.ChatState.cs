@@ -16,7 +16,10 @@ public sealed partial class Plugin
         public Vector2? RequestedSize;
         public string ActiveTabId = "", RequestedTabId = "";
         public double ScrollbarUntil;
-        public float PreviousScroll;
+        public float PreviousScroll, ScrollbarDragOffset;
+        public float ScrollMaximum;
+        public bool ScrollbarHovered, ScrollbarDragging;
+        public float? RequestedScroll;
         public DisplayDocument[] Documents = [];
         public long[] DocumentIds = [];
         public Dictionary<long, int> DocumentIndices = [];

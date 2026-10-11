@@ -29,6 +29,9 @@ internal static class CopyShortcutChecks
         typeof(Plugin).GetMethod("CompleteCopyRequest", flags)!.Invoke(plugin, null);
         Check(!input.TakeRequest() && (bool)typeof(Plugin).GetField("chatFocused", flags)!.GetValue(plugin)!,
             "disabled Ctrl+C discards queued copy without touching ImGui focus or clipboard");
+        typeof(Plugin).GetMethod("CaptureDrawCopyShortcut", flags)!.Invoke(plugin, [null, false]);
+        Check(access == 0 && !input.TakeRequest(),
+            "disabled draw-side Ctrl+C also returns before accessing game keys or ImGui chord state");
         preferences.CopyWithCtrlC = true;
         typeof(Plugin).GetMethod("SuppressGameCopy", flags)!.Invoke(plugin, [DispatchProxy.Create<IFramework, ServiceProxy>()]);
         Check(writes == 1 && input.TakeRequest(), "reenabled Ctrl+C restores overlay copy request and consumed-key behavior");

@@ -120,6 +120,7 @@ Check(mapCalls==1 && links.Notice.Length==0,"map payload routed to public API (s
 
 PresentationChecks.Run();
 NativeWindowChecks.Run();
+NativeChatVisibilityChecks.Run();
 CopyShortcutChecks.Run();
 TooltipChecks.Run();
 TooltipCleanupChecks.Run();
@@ -128,6 +129,7 @@ CleanupChecks.Run();
 CaptureBoundaryChecks.Run();
 RenderCacheChecks.Run();
 SelectionIndexChecks.Run();
+AppearanceChecks.Run();
 UiChecks.Run();
 
 static class Probe {

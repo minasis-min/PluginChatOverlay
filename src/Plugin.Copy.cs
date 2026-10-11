@@ -20,6 +20,7 @@ public sealed partial class Plugin
     private void SuppressGameCopy(IFramework _)
     {
         if (disposed) return;
+        UpdateNativeChatVisibility();
         PruneHistoryCaches();
         if (!settings.CopyWithCtrlC) { copyInput.Reset(); return; }
         if (Environment.TickCount64 - Interlocked.Read(ref inputUpdatedAt) > 250)

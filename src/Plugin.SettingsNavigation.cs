@@ -13,16 +13,16 @@ public sealed partial class Plugin
     private static readonly (string Id, string Label, FontAwesomeIcon Icon)[] SettingsPages =
     [
         ("basic", "基本", FontAwesomeIcon.Cog),
-        ("appearance", "表示・色", FontAwesomeIcon.PaintBrush),
+        ("tabs", "タブ", FontAwesomeIcon.Comments),
+        ("layout", "レイアウト", FontAwesomeIcon.PaintBrush),
         ("interaction", "操作", FontAwesomeIcon.MousePointer),
-        ("tabs", "チャットタブ", FontAwesomeIcon.Comments),
         ("history", "履歴", FontAwesomeIcon.History),
         ("diagnostics", "診断・共存", FontAwesomeIcon.InfoCircle),
     ];
 
     private void DrawConfig()
     {
-        if (resetConfigSize) { ImGui.SetNextWindowSize(new(740, 540), ImGuiCond.Always); resetConfigSize = false; }
+        if (resetConfigSize) { ImGui.SetNextWindowSize(new(settings.ConfigWidth, settings.ConfigHeight), ImGuiCond.Always); resetConfigSize = false; }
         if (minasisFrame) ui.ConstrainNextTwoColumnWindow();
         if (focusConfig)
         {
@@ -41,10 +41,11 @@ public sealed partial class Plugin
             }
             if (selectChatTabSettings)
             {
-                settingsPage = requestedSettingsPage = 3;
+                settingsPage = requestedSettingsPage = 1;
                 resetSettingsScroll = true; selectChatTabSettings = false;
             }
-            settingsChanged = false;
+            settingsChanged = UpdateConfigWindowSize();
+            var renderSettingsBefore = RenderSettingsState.Capture(settings);
             if (minasisFrame)
             {
                 settingsSidebar ??= DrawSettingsSidebar;
@@ -68,7 +69,9 @@ public sealed partial class Plugin
                                     if (settingsPage != i) resetSettingsScroll = true;
                                     settingsPage = i;
                                     if (requestedSettingsPage == i) requestedSettingsPage = -1;
-                                    DrawSettingsPage();
+                                    var pageBody = ImGui.BeginChild("SettingsPage-" + i, Vector2.Zero, false);
+                                    try { if (pageBody) DrawSettingsPage(); }
+                                    finally { ImGui.EndChild(); }
                                 }
                                 finally { ImGui.EndTabItem(); }
                             }
@@ -78,9 +81,18 @@ public sealed partial class Plugin
                 }
                 finally { ImGui.EndChild(); }
             }
-            if (settingsChanged) { presentationRevision++; ApplyUiVisibility(); Save(); }
+            if (settingsChanged) { UpdateRenderSettings(renderSettingsBefore); ApplyUiVisibility(); Save(); }
         }
         finally { ImGui.End(); }
+    }
+    private bool UpdateConfigWindowSize()
+    {
+        // Persist once resizing ends; content tabs and layout resets preserve this size.
+        if (ImGui.IsMouseDown(ImGuiMouseButton.Left)) return false;
+        var size = ImGui.GetWindowSize();
+        if (Math.Abs(size.X - settings.ConfigWidth) < 1 && Math.Abs(size.Y - settings.ConfigHeight) < 1) return false;
+        settings.ConfigWidth = size.X; settings.ConfigHeight = size.Y;
+        return true;
     }
     private void DrawSettingsSidebar()
     {
@@ -103,9 +115,9 @@ public sealed partial class Plugin
         settingsChanged |= settingsPage switch
         {
             0 => DrawBasicSettings(),
-            1 => DrawAppearance(),
-            2 => DrawInteraction(),
-            3 => DrawTabSettings(),
+            1 => DrawTabSettings(),
+            2 => DrawLayoutSettings(),
+            3 => DrawInteraction(),
             4 => DrawHistorySettings(),
             _ => DrawSettingsDiagnostics(),
         };

@@ -9,6 +9,7 @@ public sealed partial class Plugin
     private readonly Ui ui = new();
     private UiHeadingFonts? headingFonts;
     private bool minasisFrame;
+    private ChatPopupStyle popupStyle;
     private uint originalChatColor;
     private static readonly UiChoice[] UiStyles = [new("dalamud", "Dalamud標準"), new("minasis", "MinasisUI")];
 
@@ -17,10 +18,12 @@ public sealed partial class Plugin
     {
         minasisFrame = settings.UiStyle == OverlayUiStyle.Minasis;
         originalChatColor = ImGui.GetColorU32(ImGuiCol.Text);
-        if (!minasisFrame) return null;
+        if (!minasisFrame) { popupStyle = ChatPopupStyle.Capture(); return null; }
         ui.Theme = UiTheme.SoftCharcoal;
         ui.Scale = ImGuiHelpers.GlobalScale;
-        return new(ui);
+        var scope = new OverlayThemeScope(ui);
+        popupStyle = ChatPopupStyle.Capture();
+        return scope;
     }
     private bool DrawUiStyleSettings(bool sidebar = false)
     {
@@ -53,8 +56,8 @@ public sealed partial class Plugin
     }
     private void UiSection(string label)
     {
-        if (!minasisFrame) return;
-        ui.Heading(label);
+        if (minasisFrame) ui.Heading(label);
+        else { ImGui.Spacing(); ImGui.Separator(); ImGui.TextUnformatted(label); ImGui.Spacing(); }
     }
     private bool UiCheckbox(string label, ref bool value) => minasisFrame
         ? ui.Checkbox(label, VisibleLabel(label), ref value) : ImGui.Checkbox(label, ref value);
@@ -62,11 +65,11 @@ public sealed partial class Plugin
         ? ui.Button(label, VisibleLabel(label)) : ImGui.Button(label);
     // The active theme supplies Minasis colors; keep the host's inline step buttons and label layout.
     private bool UiInputInt(string label, ref int value, int step = 1, int stepFast = 100)
-        => ImGui.InputInt(label, ref value, step, stepFast);
+        => minasisFrame ? ui.InputInt(label, VisibleLabel(label), ref value, step) : ImGui.InputInt(label, ref value, step, stepFast);
     private bool UiInputText(string label, ref string value, int maxLength) => minasisFrame
         ? ui.InputText(label, VisibleLabel(label), ref value, maxLength) : ImGui.InputText(label, ref value, maxLength);
-    private bool UiSlider(string label, ref float value, float min, float max) => minasisFrame
-        ? ui.Slider(label, VisibleLabel(label), ref value, min, max, "%.0f") : ImGui.SliderFloat(label, ref value, min, max);
+    private bool UiSlider(string label, ref float value, float min, float max, string format = "%.0f") => minasisFrame
+        ? ui.Slider(label, VisibleLabel(label), ref value, min, max, format) : ImGui.SliderFloat(label, ref value, min, max, format);
     private static string VisibleLabel(string label)
     {
         var marker = label.IndexOf("##", StringComparison.Ordinal);

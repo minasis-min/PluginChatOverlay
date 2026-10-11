@@ -6,7 +6,6 @@ namespace PluginChatOverlay;
 public sealed partial class Plugin
 {
     private static readonly ImGuiCol[] BackgroundColors = [ImGuiCol.TitleBg, ImGuiCol.TitleBgActive, ImGuiCol.TitleBgCollapsed, ImGuiCol.ScrollbarBg];
-    private static readonly ImGuiCol[] ScrollbarColors = [ImGuiCol.ScrollbarBg, ImGuiCol.ScrollbarGrab, ImGuiCol.ScrollbarGrabHovered, ImGuiCol.ScrollbarGrabActive];
     private void DrawChatWindows()
     {
         var snapshot = history.RenderSnapshot();
@@ -46,7 +45,9 @@ public sealed partial class Plugin
     }
     private void PushChatBackground()
     {
-        ImGui.SetNextWindowBgAlpha(settings.BackgroundAlpha);
+        // Black alpha compositing equals multiplication by (1 - alpha); no framebuffer pass is needed.
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0, 0, 0, 1));
+        ImGui.SetNextWindowBgAlpha(settings.BackgroundBlur ? 0 : settings.BackgroundAlpha);
         foreach (var color in BackgroundColors)
         {
             var value = ImGui.GetStyle().Colors[(int)color]; value.W = settings.BackgroundAlpha; ImGui.PushStyleColor(color, value);
@@ -67,6 +68,7 @@ public sealed partial class Plugin
                     var label = tab.Name + (state.Unread > 0 ? $" ({state.Unread})" : "") + "###tab-" + tab.Id;
                     var selected = ImGui.BeginTabItem(label, View("main").RequestedTabId == tab.Id ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None);
                     DragHeader("main", ImGui.IsItemHovered());
+                    using (popupStyle.PushFor("TabMenu-" + tab.Id))
                     if (ImGui.BeginPopupContextItem("TabMenu-" + tab.Id))
                     {
                         try
@@ -102,6 +104,7 @@ public sealed partial class Plugin
                     var selected = ImGui.BeginTabItem(childTab.Name + (state.Unread > 0 ? $" ({state.Unread})" : "") + "###detached-" + childTab.Id,
                         View(tab.Id).RequestedTabId == childTab.Id ? ImGuiTabItemFlags.SetSelected : ImGuiTabItemFlags.None);
                     DragHeader(tab.Id, ImGui.IsItemHovered());
+                    using (popupStyle.PushFor("DetachedTabMenu-" + childTab.Id))
                     if (ImGui.BeginPopupContextItem("DetachedTabMenu-" + childTab.Id))
                     {
                         try
@@ -141,18 +144,7 @@ public sealed partial class Plugin
         state.ActiveTabId = active.Id;
         DrawTabHistory(active, TabDocuments(active, docs), pass);
     }
-    private void TabBarMenu(string windowId)
-    {
-        if (ImGui.MenuItem(settings.ShowTabs ? "タブバーを隠す" : "タブバーを表示")) { SetTabBarVisible(!settings.ShowTabs); Save(); }
-        if (!ImGui.BeginMenu("タブを切り替え")) return;
-        try
-        {
-            foreach (var tab in settings.WindowTabs(windowId))
-                if (ImGui.MenuItem(tab.Name + "###switch-" + tab.Id, "", View(windowId).ActiveTabId == tab.Id))
-                { View(windowId).ActiveTabId = tab.Id; View(windowId).RequestedTabId = tab.Id; }
-        }
-        finally { ImGui.EndMenu(); }
-    }
+
     private void DragHeader(string id, bool tabHovered = false)
     {
         var state = View(id);
@@ -187,18 +179,7 @@ public sealed partial class Plugin
         }
         ImGui.SetNextWindowPos(pos, ImGuiCond.Always);
     }
-    private void WindowMenu(ChatTab? tab)
-    {
-        if (!ImGui.BeginPopupContextWindow("WindowMenu", ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverItems)) return;
-        try
-        {
-            if (ImGui.MenuItem("設定を開く")) configOpen = true;
-            TabBarMenu(tab?.Id ?? "main");
-            if (tab != null && ImGui.MenuItem("他のウィンドウにタブとしてまとめる"))
-            { settings.Attach(tab, settings.Tabs.FirstOrDefault(t => t.Detached && t.Id != tab.Id)?.Id ?? "main"); tab.Visible = true; Save(); }
-        }
-        finally { ImGui.EndPopup(); }
-    }
+
     private void UpdateGeometry(string id, ChatTab? tab)
     {
         var state = View(id); var pos = ImGui.GetWindowPos(); var size = ImGui.GetWindowSize();

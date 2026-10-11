@@ -13,7 +13,7 @@ public sealed partial class Plugin
             case "config": OpenConfig(); break;
             case "on": settings.Enabled = true; Save(); break;
             case "off": settings.Enabled = false; Save(); break;
-            case "reset": ResetWindowGeometry(); Save(); break;
+            case "reset": ClearHistory(); break;
             case "test": TestMessages(); break;
             case "unlink": chat.RemoveChatLinkHandler(701); testLinkActive = false; break;
             case "burst": for (var i = 0; i < 2000; i++) chat.Print($"[PCO 負荷試験] {i} 日本語 折り返し表示の確認"); break;

@@ -15,10 +15,16 @@ internal static class SettingsStoreChecks
         Check(imported.FontSize == 24 && !imported.ShowTabs && imported.WindowTabs("root").Count() == 2
             && File.Exists(Path.Combine(configDir, "settings.json")) && File.Exists(Path.Combine(assemblyDir, "data", "settings.json")),
             "distribution config migration preserves existing settings and leaves D development config intact");
-        imported.FontSize = 19; distribution.Save(imported);
+        imported.FontSize = 19; imported.ConfigWidth = 987; imported.ConfigHeight = 654; distribution.Save(imported);
         legacy.Save(new Settings { FontSize = 30 });
         Check(distribution.Load().FontSize == 19 && !File.Exists(Path.Combine(configDir, "settings.json.tmp")),
             "standard config takes precedence and atomic save completes without leftover temporary file");
+        var restoredSize = distribution.Load();
+        Check(restoredSize.ConfigWidth == 987 && restoredSize.ConfigHeight == 654,
+            "settings window default size survives standard-config save and reload");
+        restoredSize.ConfigWidth = float.NaN; restoredSize.ConfigHeight = float.PositiveInfinity; restoredSize.Normalize();
+        Check(restoredSize.ConfigWidth == 740 && restoredSize.ConfigHeight == 540,
+            "invalid settings window dimensions fall back to finite defaults");
         var rejected = false;
         try { SettingsStore.ForDistribution("relative-config", assemblyDir); } catch (IOException) { rejected = true; }
         Check(rejected, "distribution settings reject relative storage path");

@@ -13,8 +13,8 @@ internal static class NativeWindowChecks
             var origin = new System.Numerics.Vector2(300, 200);
             var layout = NativeButtonLayout.Create(anchor, origin, 1, 18, uiScale);
             Check(layout.Position.X == origin.X + anchor.X + anchor.Width + 8 * uiScale
-                && layout.Height >= layout.FontSize + 8 * uiScale && layout.FontSize == 18 * uiScale,
-                $"native shortcut at {uiScale} scale clears scaled anchor and fits label");
+                && layout.Height == anchor.Height && layout.FontSize == 18 * uiScale,
+                $"native shortcut at {uiScale} scale clears scaled anchor and matches native button height");
             var shifted = NativeButtonLayout.Create(anchor, origin, 1, 18, uiScale, new(10, -7));
             Check(shifted.Position == layout.Position + new System.Numerics.Vector2(10, -7)
                 && shifted.Height == layout.Height && shifted.FontSize == layout.FontSize,

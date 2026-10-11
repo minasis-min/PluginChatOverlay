@@ -96,7 +96,7 @@ public sealed partial class Plugin : IDalamudPlugin
         try { links.CloseTooltip(); }
         finally
         {
-            foreach (var view in views.Values) { view.HeaderDragging = false; view.Selection.EndDrag(); }
+            foreach (var view in views.Values) { view.HeaderDragging = view.ScrollbarDragging = view.ScrollbarHovered = false; view.Selection.EndDrag(); }
             chatFocused = false; focusedView = null;
             copyInput.CancelRequest(); inputUpdatedAt = 0;
         }
@@ -127,9 +127,11 @@ public sealed partial class Plugin : IDalamudPlugin
             RefreshPlugins();
             UpdateFontChooser();
             using var selectedTheme = BeginUiTheme();
-            DrawNativeChatButtons();
+            if (chatHiddenByNativeExpansion && !nativeChatWasHidden) StopWindowDrags();
+            nativeChatWasHidden = chatHiddenByNativeExpansion;
+            if (!chatHiddenByNativeExpansion) DrawNativeChatButtons();
             using (chatFont?.Push())
-                if (!uiFault && settings.Visible && (!settings.HideLoggedOut || clientState.IsLoggedIn) && (!settings.HideDuringCutscene || !pi.UiBuilder.CutsceneActive)) DrawChatWindows();
+                if (!chatHiddenByNativeExpansion && !uiFault && settings.Visible && (!settings.HideLoggedOut || clientState.IsLoggedIn) && (!settings.HideDuringCutscene || !pi.UiBuilder.CutsceneActive)) DrawChatWindows();
             if (configOpen) DrawConfig();
             CompleteCopyRequest();
             if (geometryDirtyAt != 0 && Environment.TickCount64 - geometryDirtyAt > 650 && !ImGui.IsMouseDown(ImGuiMouseButton.Left))
@@ -143,13 +145,13 @@ public sealed partial class Plugin : IDalamudPlugin
         finally
         {
             var viewport = ImGui.GetMainViewport();
-            links.SetTooltipWindows(windowModels.Where(p => p.Value.IsOpen).Select(p => View(p.Key).Window)
+            links.SetTooltipWindows(windowModels.Where(p => !chatHiddenByNativeExpansion && p.Value.IsOpen).Select(p => View(p.Key).Window)
                 .Where(r => r != null).Select(r => r!.Value).ToArray(), viewport.Pos, viewport.Size);
             if (uiFault || !clientState.IsLoggedIn || !settings.LinkTooltips) links.BeginTooltipFrame();
             links.EndTooltipFrame();
         }
     }
-    private string Plain(ChatRecord record) => (settings.ShowTime ? ChatClock.Format(record) + " " : "") + record.Plain;
+    private string Plain(ChatRecord record) => (settings.ShowTime ? ChatClock.Format(record, settings.PadTimestampHour) + " " : "") + record.Plain;
     public void Dispose()
     {
         lock (renderCacheGate) DisposeCore();

@@ -50,7 +50,7 @@ internal sealed class DisplayDocument(ChatRecord record, string plugin, Settings
         {
             var rgba = settings.TimestampColor | 0xFF000000;
             var bgra = (rgba & 0xFF00FF00) | ((rgba & 0xFF) << 16) | ((rgba >> 16) & 0xFF);
-            var timestamp = ReadOnlySeString.FromMacroString($"<color({bgra})>{ChatClock.Format(record)}<color(stackcolor)> ");
+            var timestamp = ReadOnlySeString.FromMacroString($"<color({bgra})>{ChatClock.Format(record, settings.PadTimestampHour)}<color(stackcolor)> ");
             builder.Append(SeString.Parse(timestamp.AsSpan().Data.ToArray()));
         }
         builder.Append(SeString.Parse(bodyColor));

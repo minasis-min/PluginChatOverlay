@@ -1,5 +1,5 @@
 . "$PSScriptRoot/Environment.ps1"
-$taskVendor = Join-Path $ProjectRoot 'vendor/MinasisUI/0.1.10'
+$taskVendor = Join-Path $ProjectRoot 'vendor/MinasisUI/0.1.14'
 $taskOrigin = Get-Content -LiteralPath (Join-Path $taskVendor 'origin.json') -Raw | ConvertFrom-Json -AsHashtable
 foreach ($taskFile in $taskOrigin.Files.GetEnumerator()) {
     if ((Get-FileHash -LiteralPath (Join-Path $taskVendor $taskFile.Key) -Algorithm SHA256).Hash -ne $taskFile.Value) {

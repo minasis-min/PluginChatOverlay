@@ -43,6 +43,15 @@ internal static class PresentationChecks
         Check(FragmentLayout.Caret(glyphs, new(25, 8), 4) == 3 && FragmentLayout.Caret(glyphs, new(2, 25), 4) == 3, "caret uses wrapped glyph rectangles and cluster lengths");
         var record = new ChatRecord(1, 1, 0, 0, 0, [], [], "") { ReceivedAt = new DateTimeOffset(2026, 10, 8, 23, 34, 0, TimeSpan.FromHours(9)) };
         Check(ChatClock.Format(record) == "[23:34]", "local timestamp minute format");
+        var morning = record with { ReceivedAt = new DateTimeOffset(new DateTime(2026, 10, 12, 5, 12, 0, DateTimeKind.Local)) };
+        Check(ChatClock.Format(morning) == "[05:12]" && ChatClock.Format(morning, false) == "[5:12]"
+            && ChatClock.Format(record, false) == "[23:34]", "timestamp formats choose padded or unpadded hour with two-digit minutes");
+        var shortClock = new Settings { PadTimestampHour = false };
+        Check(new ReadOnlySeString(DisplayDocument.Content(morning, shortClock, [])).ToMacroString().Contains("[5:12]"),
+            "unpadded timestamp choice is applied to displayed history");
+        var restoredClock = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(shortClock))!;
+        Check(!restoredClock.PadTimestampHour && JsonSerializer.Deserialize<Settings>("{}")!.PadTimestampHour,
+            "timestamp preference persists while old settings retain padded hour default");
         var format = ReadOnlySeString.FromMacroString("<color(4291611852)><string(lstr2)><color(stackcolor)>");
         var prefix = ChatPalette.FirstColor(format.AsSpan().Data);
         Check(new ReadOnlySeString(prefix).ToMacroString() == "<color(4291611852)>", "default Debug color copied exactly from vanilla format");

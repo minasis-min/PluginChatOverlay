@@ -28,7 +28,7 @@ UIは **Dalamud標準／MinasisUI** を選択できます（既定：Dalamud標�
 | --- | --- |
 | `/pcoverlay` | チャットウィンドウを表示 |
 | `/pcoverlay config` | 設定を開く |
-| `/pcoverlay reset` | ウィンドウの位置・サイズを戻す |
+| `/pcoverlay reset` | オーバーレイの履歴をクリア |
 | `/pcoverlay test` | テスト通知を出力 |
 
 ## 補足

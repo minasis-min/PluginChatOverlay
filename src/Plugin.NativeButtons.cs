@@ -28,13 +28,7 @@ public sealed partial class Plugin
         var layout = NativeButtonLayout.Create(new(node->ScreenX, node->ScreenY, width, height), viewport.Pos,
             settings.NativeButtonScale, settings.NativeButtonFontSize, Math.Max(ImGuiHelpers.GlobalScale, scaleY),
             new(settings.NativeButtonOffsetX, settings.NativeButtonOffsetY));
-        ImGui.SetNextWindowViewport(viewport.ID);
-        ImGui.SetNextWindowPos(layout.Position, ImGuiCond.Always);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, Vector2.Zero);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0);
-        var draw = ImGui.Begin("###PcoNativeChatButtons", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove | ImGuiWindowFlags.AlwaysAutoResize
-            | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoNav | ImGuiWindowFlags.NoBackground);
-        ImGui.PopStyleVar(2);
+        var draw = BeginNativeButtonWindow(layout, viewport.ID);
         try
         {
             if (!draw) return;
@@ -43,37 +37,79 @@ public sealed partial class Plugin
         }
         finally { ImGui.End(); }
     }
-    private void DrawNativeButtonRow(NativeButtonLayout layout)
+    private static bool BeginNativeButtonWindow(NativeButtonLayout layout, uint viewportId)
     {
-        var buttonHeight = layout.Height;
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, buttonHeight * .5f);
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1);
-        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding, new Vector2(layout.Padding, 0));
-        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(layout.Spacing, 0));
+        const float edge = 2;
+        ImGui.SetNextWindowViewport(viewportId);
+        ImGui.SetNextWindowPos(layout.Position - new Vector2(edge), ImGuiCond.Always);
+        // Auto-resize uses prior frame content dimensions. Explicit sizing avoids
+        // clipping while sliders change the diameter, including fractional sizes.
+        ImGui.SetNextWindowSize(new(MathF.Ceiling(layout.Height * 2 + layout.Spacing + edge * 2),
+            MathF.Ceiling(layout.Height + edge * 2)), ImGuiCond.Always);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(edge));
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowBorderSize, 0);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowMinSize, Vector2.Zero);
         try
         {
-            ImGui.SetWindowFontScale(NativeFontScale(layout.FontSize));
-            var plugin = false;
-            try { plugin = ImGui.Button("Plugin##PcoNativeChat", new(0, buttonHeight)); }
-            finally { ImGui.SetWindowFontScale(1); }
-            if (plugin)
+            return ImGui.Begin("###PcoNativeChatButtons", ImGuiWindowFlags.NoDecoration | ImGuiWindowFlags.NoMove
+                | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoNav
+                | ImGuiWindowFlags.NoBackground | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse);
+        }
+        finally { ImGui.PopStyleVar(3); }
+    }
+    private void DrawNativeButtonRow(NativeButtonLayout layout)
+    {
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing, new Vector2(layout.Spacing, 0));
+
+        try
+        {
+            if (DrawNativeIcon("PcoNativeChat", FontAwesomeIcon.Comments, "チャット表示/非表示", layout))
             {
                 var windows = NativeWindows();
                 if (windows.Count > 1) ImGui.OpenPopup(NativeWindowPopup);
                 else if (windows.Count == 1) ToggleNativeWindow(windows[0].Id);
             }
             ImGui.SameLine();
-            ImGui.PushFont(UiBuilder.IconFont);
-            var gear = false;
-            try
-            {
-                ImGui.SetWindowFontScale(NativeFontScale(layout.FontSize));
-                gear = ImGui.Button(FontAwesomeIcon.Cog.ToIconString() + "##PcoNativeConfig", new(buttonHeight, buttonHeight));
-            }
-            finally { ImGui.SetWindowFontScale(1); ImGui.PopFont(); }
-            if (gear) configOpen = !configOpen;
+            if (DrawNativeIcon("PcoNativeConfig", FontAwesomeIcon.Cog, "設定", layout))
+                configOpen = !configOpen;
         }
-        finally { ImGui.PopStyleVar(4); }
+        finally { ImGui.PopStyleVar(); }
+    }
+    private static bool DrawNativeIcon(string id, FontAwesomeIcon icon, string description, NativeButtonLayout layout)
+    {
+        var clicked = DrawNativeShortcut(id, icon.ToIconString(), layout, UiBuilder.IconFont);
+        if (ImGui.IsItemHovered())
+        {
+            var bounds = ImGui.GetItemRectMin();
+            ImGui.SetNextWindowPos(new(bounds.X + layout.Height / 2, bounds.Y - 4), ImGuiCond.Always, new(.5f, 1));
+            ImGui.BeginTooltip();
+            try { ImGui.TextUnformatted(description); }
+            finally { ImGui.EndTooltip(); }
+        }
+        return clicked;
+    }
+    private static unsafe bool DrawNativeShortcut(string id, string label, NativeButtonLayout layout, ImFontPtr font)
+    {
+        // Explicit draw-list font: do not touch the shared ImGui font stack or window font scale.
+        var fontSize = Math.Min(layout.FontSize, layout.Height * .62f);
+        var size = new Vector2(layout.Height, layout.Height);
+        var position = ImGui.GetCursorScreenPos();
+        var clicked = ImGui.InvisibleButton(id, size);
+        var hovered = ImGui.IsItemHovered();
+        var pressed = ImGui.IsItemActive();
+        var drawList = ImGui.GetWindowDrawList();
+        var fill = pressed ? 0xFF44484B : hovered ? 0xFF74797D : 0xFF565B5F;
+        drawList.AddRectFilled(position, position + size, fill, layout.Height / 2);
+        drawList.AddRect(position, position + size, 0xFFA0A5A8, layout.Height / 2);
+        if (font.IsNull || font.FontSize <= 0 || label.Length == 0) return clicked;
+        var glyph = font.FindGlyph(label[0]);
+        if (glyph == null) return clicked;
+        var scale = fontSize / font.FontSize;
+        var inkCenter = new Vector2((glyph->X0 + glyph->X1) / 2, (glyph->Y0 + glyph->Y1) / 2) * scale;
+        var textPosition = position + size / 2 - inkCenter;
+        drawList.AddText(font, fontSize, textPosition + new Vector2(0, 1), 0xB0000000, label);
+        drawList.AddText(font, fontSize, textPosition, 0xFFE6E6E6, label);
+        return clicked;
     }
     private void NativeWindowMenu()
     {
@@ -100,6 +136,8 @@ public sealed partial class Plugin
     private bool DrawNativeButtonSettings()
     {
         UiSection("ショートカット");
+        ImGui.TextWrapped("吹き出し：チャット表示/非表示。複数ウィンドウがある場合は、切り替えるウィンドウを選びます。");
+        ImGui.TextWrapped("歯車：設定。クリックすると設定画面を開く・閉じることができます。");
         var changed = false;
         var show = settings.ShowNativeButtons;
         if (UiCheckbox("ボタンを表示", ref show)) { settings.ShowNativeButtons = show; changed = true; }
@@ -107,7 +145,7 @@ public sealed partial class Plugin
         if (UiSlider("ボタンサイズ (%)", ref size, 50, 200)) { settings.NativeButtonScale = size / 100; changed = true; }
         var font = (int)MathF.Round(settings.NativeButtonFontSize);
         ImGui.SetNextItemWidth(180);
-        if (UiInputInt("ボタンの文字サイズ (px)", ref font, 1, 4)) { settings.NativeButtonFontSize = Math.Clamp(font, 8, 32); changed = true; }
+        if (UiInputInt("ボタンのアイコンサイズ (px)", ref font, 1, 4)) { settings.NativeButtonFontSize = Math.Clamp(font, 8, 32); changed = true; }
         var x = settings.NativeButtonOffsetX;
         if (NativeOffsetInput("native-offset-x", "横位置調整 (px)", ref x)) { settings.NativeButtonOffsetX = x; changed = true; }
         var y = settings.NativeButtonOffsetY;
@@ -127,11 +165,6 @@ public sealed partial class Plugin
             : ImGui.InputInt(label, ref value, 1, 10);
         if (changed) value = Math.Clamp(value, -2000, 2000);
         return changed;
-    }
-    private static float NativeFontScale(float fontSize)
-    {
-        var size = ImGui.GetFontSize();
-        return size > 0 ? fontSize / size : 1;
     }
     private readonly record struct NativeWindowChoice(string Id, string Label, bool Open);
 }

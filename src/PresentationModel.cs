@@ -130,7 +130,7 @@ internal sealed class TextSelection
 
 internal static class ChatClock
 {
-    public static string Format(ChatRecord record) => (record.Timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(record.Timestamp) : record.ReceivedAt).ToLocalTime().ToString("[HH:mm]", CultureInfo.InvariantCulture);
+    public static string Format(ChatRecord record, bool padHour = true) => (record.Timestamp > 0 ? DateTimeOffset.FromUnixTimeSeconds(record.Timestamp) : record.ReceivedAt).ToLocalTime().ToString(padHour ? "[HH:mm]" : "[H:mm]", CultureInfo.InvariantCulture);
 }
 
 internal static class ChatRowGeometry

@@ -7,16 +7,21 @@ internal enum OverlayUiStyle { Dalamud, Minasis }
 
 internal sealed class Settings
 {
+    internal const float DefaultConfigWidth = 740;
+    internal const float DefaultConfigHeight = 540;
     public OverlayUiStyle UiStyle { get; set; } = OverlayUiStyle.Dalamud;
     public bool Enabled { get; set; } // Initial opt-in for this unverified development build.
     public bool Visible { get; set; } = true;
     public bool MainWindowVisible { get; set; } = true;
+    public float ConfigWidth { get; set; } = DefaultConfigWidth;
+    public float ConfigHeight { get; set; } = DefaultConfigHeight;
     public float BackgroundAlpha { get; set; } = .8f;
     public float FontSize { get; set; } = 17;
     public int LineSpacing { get; set; }
     [JsonIgnore] public int MinimumLineSpacing => -(int)MathF.Floor(FontSize / 2);
     [JsonIgnore] public float LineHeightRatio => 1f + LineSpacing / FontSize;
     public bool ShowTime { get; set; } = true;
+    public bool PadTimestampHour { get; set; } = true;
     public uint TimestampColor { get; set; } = 0xFFFFFFFF;
     public int HistoryLimit { get; set; } = History.DefaultRecords;
     public bool CopyOnDragRelease { get; set; }
@@ -27,6 +32,34 @@ internal sealed class Settings
     public bool AllowResize { get; set; } = true;
     public bool HideDuringCutscene { get; set; } = true;
     public bool HideLoggedOut { get; set; } = true;
+    public bool HideWhenNativeChatExpanded { get; set; }
+    public bool BackgroundBlur { get; set; }
+    public float BlurStrength { get; set; } = 1.5f;
+    public bool TextOutline { get; set; }
+    public float OutlineStrength { get; set; } = 1;
+    public uint OutlineColor { get; set; } = 0xFF000000;
+    public int LetterSpacing { get; set; }
+    public bool CustomWindowLayout { get; set; }
+    public bool WindowLayoutInitialized { get; set; }
+    public int InnerPaddingX { get; set; } = 8;
+    public int InnerPaddingY { get; set; } = 8;
+    public int BorderWidth { get; set; } = 1;
+    public uint BorderColor { get; set; } = 0x806E6E80;
+    public int WindowRounding { get; set; } = 4;
+    public bool ScrollbarLeft { get; set; }
+    public bool CustomScrollbar { get; set; }
+    public bool ScrollbarWhite { get; set; }
+    public uint? ScrollbarColor { get; set; }
+    public bool ScrollbarOutline { get; set; }
+    public uint ScrollbarOutlineColor { get; set; } = 0xFF8AD5E6; // Warm vanilla-inspired yellow (#E6D58A).
+    public int ScrollbarOutlineWidth { get; set; } = 1;
+    public int ScrollbarWidth { get; set; } = 14;
+    public int ScrollbarOffsetX { get; set; }
+    public int? ScrollbarPositionX { get; set; }
+    public int ScrollbarOffsetY { get; set; }
+    public int? ScrollbarTopAdjustment { get; set; }
+    public int? ScrollbarBottomAdjustment { get; set; }
+    public int ScrollbarDisplay { get; set; } = 1; // 0: hidden, 1: while scrolling, 2: always
     public bool LinkTooltips { get; set; } = true;
     public bool ShowNativeButtons { get; set; } = true;
     public float NativeButtonScale { get; set; } = 1;
@@ -46,12 +79,80 @@ internal sealed class Settings
     public float Height { get; set; } = 360;
     [JsonIgnore] public Vector2 Position => new(X, Y);
     [JsonIgnore] public Vector2 Size => new(Width, Height);
+    // Retain the saved legacy flag, but direct edits no longer require an opt-in checkbox.
+    [JsonIgnore] public bool UsesCustomScrollbar => CustomScrollbar
+        || ScrollbarLeft || ScrollbarOutline || ScrollbarWidth != 14
+        || ScrollbarPositionX.HasValue || ScrollbarOffsetX != 0 || ScrollbarOffsetY != 0
+        || ScrollbarTopAdjustment.GetValueOrDefault() != 0 || ScrollbarBottomAdjustment.GetValueOrDefault() != 0;
+    public uint ResolveScrollbarColor(uint themeColor) => ScrollbarColor ?? (ScrollbarWhite ? 0xFFFFFFFFu : themeColor);
+    public void ResetLayout()
+    {
+        var defaults = new Settings();
+        BackgroundAlpha = defaults.BackgroundAlpha;
+        FontSize = defaults.FontSize;
+        LineSpacing = defaults.LineSpacing;
+        ShowTime = defaults.ShowTime;
+        PadTimestampHour = defaults.PadTimestampHour;
+        TimestampColor = defaults.TimestampColor;
+        BackgroundBlur = defaults.BackgroundBlur;
+        BlurStrength = defaults.BlurStrength;
+        TextOutline = defaults.TextOutline;
+        OutlineStrength = defaults.OutlineStrength;
+        OutlineColor = defaults.OutlineColor;
+        LetterSpacing = defaults.LetterSpacing;
+        CustomWindowLayout = defaults.CustomWindowLayout;
+        WindowLayoutInitialized = defaults.WindowLayoutInitialized;
+        InnerPaddingX = defaults.InnerPaddingX;
+        InnerPaddingY = defaults.InnerPaddingY;
+        BorderWidth = defaults.BorderWidth;
+        BorderColor = defaults.BorderColor;
+        WindowRounding = defaults.WindowRounding;
+        ScrollbarLeft = defaults.ScrollbarLeft;
+        CustomScrollbar = defaults.CustomScrollbar;
+        ScrollbarWhite = defaults.ScrollbarWhite;
+        ScrollbarColor = defaults.ScrollbarColor;
+        ScrollbarOutline = defaults.ScrollbarOutline;
+        ScrollbarOutlineColor = defaults.ScrollbarOutlineColor;
+        ScrollbarOutlineWidth = defaults.ScrollbarOutlineWidth;
+        ScrollbarWidth = defaults.ScrollbarWidth;
+        ScrollbarOffsetX = defaults.ScrollbarOffsetX;
+        ScrollbarPositionX = defaults.ScrollbarPositionX;
+        ScrollbarOffsetY = defaults.ScrollbarOffsetY;
+        ScrollbarTopAdjustment = defaults.ScrollbarTopAdjustment;
+        ScrollbarBottomAdjustment = defaults.ScrollbarBottomAdjustment;
+        ScrollbarDisplay = defaults.ScrollbarDisplay;
+        LinkTooltips = defaults.LinkTooltips;
+        ShowNativeButtons = defaults.ShowNativeButtons;
+        NativeButtonScale = defaults.NativeButtonScale;
+        NativeButtonFontSize = defaults.NativeButtonFontSize;
+        NativeButtonOffsetX = defaults.NativeButtonOffsetX;
+        NativeButtonOffsetY = defaults.NativeButtonOffsetY;
+        FontIdType = defaults.FontIdType;
+        FontIdJson = defaults.FontIdJson;
+    }
     public void Normalize()
     {
         if (!Enum.IsDefined(UiStyle)) UiStyle = OverlayUiStyle.Dalamud;
+        ConfigWidth = float.IsFinite(ConfigWidth) ? Math.Clamp(ConfigWidth, 400, 8000) : DefaultConfigWidth;
+        ConfigHeight = float.IsFinite(ConfigHeight) ? Math.Clamp(ConfigHeight, 300, 8000) : DefaultConfigHeight;
         BackgroundAlpha = float.IsFinite(BackgroundAlpha) ? Math.Clamp(BackgroundAlpha, 0, 1) : .8f;
         FontSize = float.IsFinite(FontSize) ? Math.Clamp(MathF.Round(FontSize), 10, 36) : 17;
         NormalizeLineSpacing();
+        LetterSpacing = Math.Clamp(LetterSpacing, -2, 12);
+        InnerPaddingX = Math.Clamp(InnerPaddingX, 0, 40);
+        InnerPaddingY = Math.Clamp(InnerPaddingY, 0, 40);
+        BorderWidth = Math.Clamp(BorderWidth, 0, 8);
+        WindowRounding = Math.Clamp(WindowRounding, 0, 24);
+        ScrollbarWidth = Math.Clamp(ScrollbarWidth, 2, 24);
+        ScrollbarOutlineWidth = Math.Clamp(ScrollbarOutlineWidth, 1, 4);
+        ScrollbarOffsetX = Math.Clamp(ScrollbarOffsetX, -200, 200);
+        if (ScrollbarPositionX is { } barX) ScrollbarPositionX = Math.Clamp(barX, 0, 20000);
+        ScrollbarOffsetY = Math.Clamp(ScrollbarOffsetY, -200, 200);
+        if (ScrollbarTopAdjustment is { } top) ScrollbarTopAdjustment = Math.Clamp(top, -200, 200);
+        if (ScrollbarBottomAdjustment is { } bottom) ScrollbarBottomAdjustment = Math.Clamp(bottom, -200, 200);
+        ScrollbarDisplay = Math.Clamp(ScrollbarDisplay, 0, 2);
+        BlurStrength = float.IsFinite(BlurStrength) ? Math.Clamp(BlurStrength, .1f, 24) : 1.5f;
+        OutlineStrength = float.IsFinite(OutlineStrength) ? Math.Clamp(OutlineStrength, .1f, 3) : 1;
         HistoryLimit = Math.Clamp(HistoryLimit, 10, History.MaxRecords);
         TimestampColor |= 0xFF000000;
         SnapDistance = float.IsFinite(SnapDistance) ? Math.Clamp(SnapDistance, 4, 40) : 16;
