@@ -87,7 +87,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.5: レイアウト設定を拡充・整理。スクロールバー、背景の縁、文字の縁取り・間隔、時刻形式を調整可能。標準チャット拡大中の非表示とボタン表示を改善。'
+$taskEntry.Changelog = '1.0.6: 標準／カスタムの外観切替、Alt＋ドラッグ移動を追加。カスタムの外観をUI切替後も保持し、行の間隔とログ同士の間隔を個別に調整可能。設定移行と入力・描画の不具合を修正。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"
