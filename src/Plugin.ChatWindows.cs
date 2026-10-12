@@ -46,8 +46,9 @@ public sealed partial class Plugin
     private void PushChatBackground()
     {
         // Black alpha compositing equals multiplication by (1 - alpha); no framebuffer pass is needed.
-        ImGui.PushStyleColor(ImGuiCol.WindowBg, new Vector4(0, 0, 0, 1));
-        ImGui.SetNextWindowBgAlpha(settings.BackgroundBlur ? 0 : settings.BackgroundAlpha);
+        var background = settings.DarkenBackground ? new Vector4(0, 0, 0, 1) : ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg];
+        ImGui.PushStyleColor(ImGuiCol.WindowBg, background);
+        ImGui.SetNextWindowBgAlpha(settings.UseBackgroundBlur ? 0 : settings.BackgroundAlpha);
         foreach (var color in BackgroundColors)
         {
             var value = ImGui.GetStyle().Colors[(int)color]; value.W = settings.BackgroundAlpha; ImGui.PushStyleColor(color, value);
@@ -56,9 +57,10 @@ public sealed partial class Plugin
     private void DrawMainWindow(DisplayDocument[] docs)
     {
         DragHeader("main"); UpdateGeometry("main", null);
-        chatFocused |= !settings.ClickThrough && ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
-        if (!settings.ShowTabs) DrawWithoutTabs("main", docs, settings.ClickThrough);
-        else if (ImGui.BeginTabBar("ChatTabs"))
+        var pass = settings.ClickThrough || AltMoveActive("main");
+        chatFocused |= !pass && ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
+        if (!settings.ShowTabs) DrawWithoutTabs("main", docs, pass);
+        else if (BeginChatTabBar("ChatTabs", "main"))
         {
             try
             {
@@ -81,20 +83,21 @@ public sealed partial class Plugin
                     }
                     if (!selected) continue;
                     View("main").ActiveTabId = tab.Id;
-                    try { DrawTabHistory(tab, TabDocuments(tab, docs), settings.ClickThrough); }
+                    try { DrawTabHistory(tab, TabDocuments(tab, docs), pass); }
                     finally { ImGui.EndTabItem(); }
                 }
             }
-            finally { ImGui.EndTabBar(); View("main").RequestedTabId = ""; }
+            finally { EndChatTabBar(); View("main").RequestedTabId = ""; }
         }
-        WindowMenu(null);
+        if (!AltMoveActive("main")) WindowMenu(null);
     }
     private void DrawDetached(ChatTab tab, DisplayDocument[] docs)
     {
         DragHeader(tab.Id); UpdateGeometry(tab.Id, tab);
-        chatFocused |= !tab.ClickThrough && ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
-        if (!settings.ShowTabs) DrawWithoutTabs(tab.Id, docs, tab.ClickThrough);
-        else if (ImGui.BeginTabBar("DetachedTabs"))
+        var pass = tab.ClickThrough || AltMoveActive(tab.Id);
+        chatFocused |= !pass && ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows);
+        if (!settings.ShowTabs) DrawWithoutTabs(tab.Id, docs, pass);
+        else if (BeginChatTabBar("DetachedTabs", tab.Id))
         {
             try
             {
@@ -118,13 +121,29 @@ public sealed partial class Plugin
                     }
                     if (!selected) continue;
                     View(tab.Id).ActiveTabId = childTab.Id;
-                    try { DrawTabHistory(childTab, TabDocuments(childTab, docs), tab.ClickThrough); }
+                    try { DrawTabHistory(childTab, TabDocuments(childTab, docs), pass); }
                     finally { ImGui.EndTabItem(); }
                 }
             }
-            finally { ImGui.EndTabBar(); View(tab.Id).RequestedTabId = ""; }
+            finally { EndChatTabBar(); View(tab.Id).RequestedTabId = ""; }
         }
-        WindowMenu(tab);
+        if (!AltMoveActive(tab.Id)) WindowMenu(tab);
+    }
+    private bool BeginChatTabBar(string label, string windowId)
+    {
+        ImGui.BeginDisabled(AltMoveActive(windowId));
+        try
+        {
+            if (ImGui.BeginTabBar(label)) return true;
+        }
+        catch { ImGui.EndDisabled(); throw; }
+        ImGui.EndDisabled();
+        return false;
+    }
+    private static void EndChatTabBar()
+    {
+        try { ImGui.EndTabBar(); }
+        finally { ImGui.EndDisabled(); }
     }
     private void SetTabBarVisible(bool visible)
     {
@@ -132,6 +151,7 @@ public sealed partial class Plugin
         foreach (var state in views.Values)
         {
             state.HeaderDragging = false;
+            state.PendingAltFrame = -1;
             if (state.ActiveTabId.Length > 0) state.RequestedTabId = state.ActiveTabId;
         }
     }
@@ -152,31 +172,38 @@ public sealed partial class Plugin
         var mouse = ImGui.GetMousePos(); var pos = ImGui.GetWindowPos(); var size = ImGui.GetWindowSize();
         var titleHovered = settings.ShowWindowTitle && ImGui.IsWindowHovered() && mouse.Y >= pos.Y && mouse.Y < pos.Y + ImGui.GetFrameHeight()
             && mouse.X >= pos.X + 25 && mouse.X < pos.X + size.X - ImGui.GetFrameHeight() * 3;
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left) && (titleHovered || tabHovered))
+        var alt = AltMoveActive(id);
+        var altHovered = alt && ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows)
+            && (!settings.ShowWindowTitle || mouse.Y >= pos.Y + ImGui.GetFrameHeight() || titleHovered);
+        if (!state.HeaderDragging && ImGui.IsMouseClicked(ImGuiMouseButton.Left))
         {
-            state.HeaderDragging = true; state.DragMouseStart = mouse; state.DragWindowStart = pos;
+            if (alt ? altHovered : titleHovered || tabHovered) StartWindowDrag(state, mouse, pos, alt);
+            else if (alt && (state.Host?.Tab?.ClickThrough ?? settings.ClickThrough)
+                && mouse.X >= pos.X && mouse.X < pos.X + size.X && mouse.Y >= pos.Y && mouse.Y < pos.Y + size.Y
+                && (!settings.ShowWindowTitle || mouse.Y >= pos.Y + ImGui.GetFrameHeight()) && CanQueueAltPress())
+            {
+                state.PendingAltFrame = ImGui.GetFrameCount();
+                state.PendingAltRootId = ImGuiP.GetCurrentWindowRead().RootWindow.ID;
+                state.PendingAltMouse = mouse; state.PendingAltWindow = pos;
+            }
         }
     }
+    private bool AltMoveActive(string id) => settings.AltDragMove && settings.AllowMove
+        && !(View(id).Host?.IsPinned ?? settings.Pinned) && ImGui.GetIO().KeyAlt;
     // All window position changes occur before Begin: background, tabs and text share one origin.
     private void ApplyHeaderDrag(string id)
     {
         var state = View(id);
-        if (!state.HeaderDragging) return;
-        if (!settings.AllowMove || state.Host is { } host && (host.IsPinned || host.IsClickthrough))
-        { state.HeaderDragging = false; return; }
-        var pos = WindowDrag.Position(state.DragWindowStart, state.DragMouseStart, ImGui.GetMousePos());
-        if (!ImGui.IsMouseDown(ImGuiMouseButton.Left))
-        {
-            state.HeaderDragging = false;
-            if (settings.SnapWindows && state.Window is { } rect)
-            {
-                var viewport = ImGui.GetMainViewport();
-                var targets = views.Where(p => p.Key != id && p.Value.Window != null && settings.IsWindowVisible(p.Key))
-                    .Select(p => p.Value.Window!.Value);
-                pos = WindowSnap.Position(new(pos.X, pos.Y, rect.Width, rect.Height),
-                    new(viewport.WorkPos.X, viewport.WorkPos.Y, viewport.WorkSize.X, viewport.WorkSize.Y), targets, settings.SnapDistance);
-            }
-        }
+        if (!state.HeaderDragging) { state.AltDragging = false; return; }
+        var altEnded = state.AltDragging && !AltMoveActive(id);
+        if (!settings.AllowMove || state.Host is { } host && (host.IsPinned || host.IsClickthrough && !altEnded))
+        { state.HeaderDragging = state.AltDragging = false; return; }
+        // A modifier release must finish at the last rendered origin, rather than
+        // following mouse movement that arrived after Alt was released.
+        var pos = altEnded ? state.Window is { } last ? new Vector2(last.X, last.Y) : state.LastDragPosition
+            : WindowDrag.Position(state.DragWindowStart, state.DragMouseStart, ImGui.GetMousePos());
+        if (altEnded || !ImGui.IsMouseDown(ImGuiMouseButton.Left)) pos = FinishWindowDrag(id, state, pos);
+        state.LastDragPosition = pos;
         ImGui.SetNextWindowPos(pos, ImGuiCond.Always);
     }
 

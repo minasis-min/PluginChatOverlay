@@ -21,7 +21,7 @@ public sealed partial class Plugin
     {
         settings.ResetGeometry(); resetGeometry = true;
         foreach (var state in views.Values)
-        { state.ResetGeometry = true; state.HeaderDragging = false; state.RequestedSize = null; }
+        { state.ResetGeometry = true; state.HeaderDragging = false; state.PendingAltFrame = -1; state.RequestedSize = null; }
     }
     private bool DrawBasicSettings()
     {
@@ -74,13 +74,32 @@ public sealed partial class Plugin
         ImGui.TextWrapped("10～36px。指定サイズでフォントを生成し、本文と時刻に適用します。");
         var lineSpacing = settings.LineSpacing;
         ImGui.SetNextItemWidth(180);
-        if (UiInputInt("行間 (調整px)", ref lineSpacing, 1, 4))
+        if (UiInputInt("行の間隔 (調整px)", ref lineSpacing, 1, 4))
         { settings.LineSpacing = lineSpacing; settings.NormalizeLineSpacing(); changed = true; }
         ImGui.SameLine();
-        if (UiButton("行間を標準に戻す")) { settings.LineSpacing = 0; changed = true; }
-        ImGui.TextWrapped($"{settings.MinimumLineSpacing}～24px。マイナスで行間を詰め、プラスで広げます。チャット同士と折り返した行に適用します。−／＋ボタンは1pxずつ調整します。0で従来の間隔です。下限は文字サイズの半分まで。詰めすぎると文字が重なる場合があります。");
+        if (UiButton("行の間隔を初期値に戻す")) { settings.LineSpacing = 0; changed = true; }
+        ImGui.TextWrapped($"{settings.MinimumLineSpacing}～24px。マイナスで行間を詰め、プラスで広げます。文字の行高を調整します。ログ同士の余白は別に調整できます。−／＋ボタンは1pxずつ調整します。0で従来の間隔です。下限は文字サイズの半分まで。詰めすぎると文字が重なる場合があります。");
+        ImGui.BeginDisabled(!settings.IsCustomAppearance);
+        try
+        {
+            var scale = ChatStyleSnapshot.Scale(Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale);
+            var gap = (settings.CustomMessageGap ?? 0) * scale;
+            ImGui.SetNextItemWidth(180);
+            var gapChanged = minasisFrame
+                ? ui.InputFloat("message-gap", "ログ同士の間隔 (px)", ref gap, 1, true, 0, 80 * scale, "%.1f")
+                : ImGui.InputFloat("ログ同士の間隔 (px)", ref gap, 1, 4, "%.1f");
+            if (gapChanged && float.IsFinite(gap)) { settings.CustomMessageGap = Math.Clamp(gap / scale, 0, 80); changed = true; }
+            ImGui.SameLine();
+            if (UiButton("ログの間隔を初期値に戻す"))
+            { settings.CustomMessageGap = settings.CustomChatStyle?.MessageGap ?? ImGui.GetStyle().ItemSpacing.Y / scale; changed = true; }
+        }
+        finally { ImGui.EndDisabled(); }
+        ImGui.TextWrapped("ログ同士の余白です。カスタム時に適用します。");
         changed |= DrawFontSettings();
-        changed |= DrawTextDecorationSettings();
+        DrawCustomAppearanceNotice();
+        ImGui.BeginDisabled(!settings.IsCustomAppearance);
+        try { changed |= DrawTextDecorationSettings(); }
+        finally { ImGui.EndDisabled(); }
         return changed;
     }
     private static readonly MinasisUI.UiChoice[] TimestampFormats = [new("padded", "[01:23]"), new("short", "[1:23]")];
@@ -103,11 +122,17 @@ public sealed partial class Plugin
         var time = settings.ShowTime;
         if (UiCheckbox("時刻表示", ref time)) { settings.ShowTime = time; changed = true; }
         var format = settings.PadTimestampHour ? 0 : 1;
-        ImGui.SetNextItemWidth(160);
-        var formatChanged = minasisFrame
-            ? ui.Dropdown("timestamp-format", "時刻の形式", ref format, TimestampFormats)
-            : ImGui.Combo("時刻の形式", ref format, "[01:23]\0[1:23]\0");
-        if (formatChanged) { settings.PadTimestampHour = format == 0; changed = true; }
+        DrawCustomAppearanceNotice();
+        ImGui.BeginDisabled(!settings.IsCustomAppearance);
+        try
+        {
+            ImGui.SetNextItemWidth(160);
+            var formatChanged = minasisFrame
+                ? ui.Dropdown("timestamp-format", "時刻の形式", ref format, TimestampFormats)
+                : ImGui.Combo("時刻の形式", ref format, "[01:23]\0[1:23]\0");
+            if (formatChanged) { settings.PadTimestampHour = format == 0; changed = true; }
+        }
+        finally { ImGui.EndDisabled(); }
         var rgba = ImGui.ColorConvertU32ToFloat4(settings.TimestampColor); var rgb = new Vector3(rgba.X, rgba.Y, rgba.Z);
         ImGui.SetNextItemWidth(240);
         if (ImGui.ColorEdit3("時刻の色", ref rgb)) { settings.TimestampColor = ImGui.ColorConvertFloat4ToU32(new(rgb, 1)); changed = true; }

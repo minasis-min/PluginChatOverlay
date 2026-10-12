@@ -43,6 +43,8 @@ public sealed partial class Plugin
         private readonly Plugin owner;
         private readonly string id;
         private bool stylesPushed;
+        private ChatStyleSnapshot.Scope? customBaseScope;
+        private bool temporarilyInteractive;
         private bool layoutStylesPushed;
         private bool softBorderPushed;
         private uint softBorderColor;
@@ -63,20 +65,24 @@ public sealed partial class Plugin
                 && !owner.chatHiddenByNativeExpansion
                 && (!owner.settings.HideLoggedOut || owner.clientState.IsLoggedIn)
                 && (!owner.settings.HideDuringCutscene || !owner.pi.UiBuilder.CutsceneActive);
-            if (!visible) owner.View(id).HeaderDragging = false;
+            if (!visible) { owner.View(id).HeaderDragging = owner.View(id).AltDragging = false; owner.View(id).PendingAltFrame = -1; }
             return visible;
         }
         public override void PreDraw()
         {
-            if (owner.EnsureWindowLayoutDefaults()) owner.geometryDirtyAt = Environment.TickCount64;
-            AllowBackgroundBlur = !owner.settings.BackgroundBlur;
+            owner.InitializeCustomAppearance();
+
+            AllowBackgroundBlur = !owner.settings.UseBackgroundBlur;
             WindowName = Tab == null ? WindowTitle.MainTitle(owner.settings.ShowWindowTitle) : WindowTitle.Detached(Tab.Name, Tab.Id, owner.View(id).Unread);
             IsPinned = Tab?.Pinned ?? owner.settings.Pinned;
-            IsClickthrough = Tab?.ClickThrough ?? owner.settings.ClickThrough;
+            var pass = Tab?.ClickThrough ?? owner.settings.ClickThrough;
+            temporarilyInteractive = pass && owner.AltMoveActive(id);
+            IsClickthrough = pass && !temporarilyInteractive;
             Flags = ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse
-                | (owner.settings.AllowResize ? ImGuiWindowFlags.None : ImGuiWindowFlags.NoResize)
+                | (owner.settings.AllowResize && !owner.AltMoveActive(id) ? ImGuiWindowFlags.None : ImGuiWindowFlags.NoResize)
                 | (owner.settings.ShowWindowTitle ? ImGuiWindowFlags.None : ImGuiWindowFlags.NoTitleBar);
             if (!owner.settings.ShowWindowTitle) { Collapsed = false; CollapsedCondition = ImGuiCond.Always; }
+            owner.ResolvePendingAltDrag(id);
             owner.ApplyHeaderDrag(id);
             if (Tab == null && owner.resetGeometry)
             {
@@ -93,7 +99,10 @@ public sealed partial class Plugin
                 ImGui.SetNextWindowSize(requestedSize, ImGuiCond.Always);
                 owner.View(id).RequestedSize = null;
             }
-            layoutStylesPushed = owner.settings.CustomWindowLayout;
+            if (owner.settings.IsCustomAppearance && owner.settings.CustomChatStyle is { } customStyle)
+                customBaseScope = customStyle.Push(Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale);
+            if (owner.EnsureWindowLayoutDefaults()) owner.geometryDirtyAt = Environment.TickCount64;
+            layoutStylesPushed = owner.settings.UseCustomWindowLayout;
             if (layoutStylesPushed)
             {
                 ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new System.Numerics.Vector2(owner.settings.InnerPaddingX, owner.settings.InnerPaddingY));
@@ -101,7 +110,7 @@ public sealed partial class Plugin
                 ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, owner.settings.WindowRounding);
                 ImGui.PushStyleColor(ImGuiCol.Border, owner.settings.BorderColor);
             }
-            softBorderPushed = owner.settings.BackgroundBlur;
+            softBorderPushed = owner.settings.UseBackgroundBlur;
             if (softBorderPushed)
             {
                 softBorderColor = ImGui.GetColorU32(ImGuiCol.Border);
@@ -115,7 +124,7 @@ public sealed partial class Plugin
             if (ImGui.GetScrollY() != 0) ImGui.SetScrollY(0);
             try
             {
-                if (owner.settings.BackgroundBlur)
+                if (owner.settings.UseBackgroundBlur)
                 {
                     var start = ImGui.GetWindowPos(); var end = start + ImGui.GetWindowSize();
                     var position = start;
@@ -149,9 +158,11 @@ public sealed partial class Plugin
                 if (layoutStylesPushed) ImGui.PopStyleVar(3);
                 softBorderPushed = false; layoutStylesPushed = false; stylesPushed = false;
             }
+            customBaseScope?.Dispose(); customBaseScope = null;
             Collapsed = null;
             var pinned = Tab?.Pinned ?? owner.settings.Pinned;
             var pass = Tab?.ClickThrough ?? owner.settings.ClickThrough;
+            if (temporarilyInteractive) { IsClickthrough = pass; temporarilyInteractive = false; }
             if (pinned == IsPinned && pass == IsClickthrough) return;
             if (Tab == null) { owner.settings.Pinned = IsPinned; owner.settings.ClickThrough = IsClickthrough; }
             else { Tab.Pinned = IsPinned; Tab.ClickThrough = IsClickthrough; }

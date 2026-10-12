@@ -27,12 +27,29 @@ internal sealed class SettingsStore
         saveBlocked = true;
         var migrate = !File.Exists(path) && legacyPath != null && File.Exists(legacyPath);
         var input = File.Exists(path) ? path : migrate ? legacyPath! : null;
-        var settings = input != null ? JsonSerializer.Deserialize<Settings>(File.ReadAllText(input))
-            ?? throw new JsonException("設定ファイルがnullです。") : new();
+        var settings = input != null ? Parse(File.ReadAllText(input)) : new();
         settings.Normalize();
         saveBlocked = false;
         try { if (migrate) Save(settings); }
         catch { saveBlocked = true; throw; }
+        return settings;
+    }
+    internal static Settings Parse(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException("設定はJSONオブジェクトである必要があります。");
+        var settings = JsonSerializer.Deserialize<Settings>(json) ?? throw new JsonException("設定ファイルがnullです。");
+        var missingAppearance = !document.RootElement.TryGetProperty(nameof(Settings.AppearanceMode), out _);
+        var missingBackground = !document.RootElement.TryGetProperty(nameof(Settings.BackgroundMode), out _);
+        if (missingAppearance || missingBackground)
+        {
+            // 1.0.5 always saves BackgroundBlur, including false. Once modes are
+            // saved, use them directly and no longer infer the previous appearance.
+            var recent = document.RootElement.TryGetProperty(nameof(Settings.BackgroundBlur), out _);
+            if (missingAppearance) settings.AppearanceMode = recent ? ChatAppearanceMode.Custom : ChatAppearanceMode.Standard;
+            if (missingBackground) settings.BackgroundMode = recent ? ChatBackgroundMode.Darken : ChatBackgroundMode.Normal;
+        }
+        settings.Normalize();
         return settings;
     }
     public void Save(Settings settings)

@@ -15,7 +15,7 @@ internal static class RenderCacheChecks
             CustomWindowLayout = true, InnerPaddingX = 25, TextOutline = true, NativeButtonOffsetX = 123 };
         var preservedTabs = resetSettings.Tabs;
         resetSettings.ResetLayout();
-        var defaults = new Settings();        var layoutProperties = new[] { "BackgroundAlpha", "FontSize", "LineSpacing", "ShowTime", "PadTimestampHour", "TimestampColor", "BackgroundBlur", "BlurStrength", "TextOutline", "OutlineStrength", "OutlineColor", "LetterSpacing", "CustomWindowLayout", "WindowLayoutInitialized", "InnerPaddingX", "InnerPaddingY", "BorderWidth", "BorderColor", "WindowRounding", "ScrollbarLeft", "CustomScrollbar", "ScrollbarWhite", "ScrollbarColor", "ScrollbarOutline", "ScrollbarOutlineColor", "ScrollbarOutlineWidth", "ScrollbarWidth", "ScrollbarOffsetX", "ScrollbarPositionX", "ScrollbarOffsetY", "ScrollbarTopAdjustment", "ScrollbarBottomAdjustment", "ScrollbarDisplay", "LinkTooltips", "ShowNativeButtons", "NativeButtonScale", "NativeButtonFontSize", "NativeButtonOffsetX", "NativeButtonOffsetY", "FontIdType", "FontIdJson" };
+        var defaults = new Settings();        var layoutProperties = new[] { "AppearanceMode", "BackgroundMode", "BackgroundAlpha", "FontSize", "LineSpacing", "CustomMessageGap", "ShowTime", "PadTimestampHour", "TimestampColor", "BackgroundBlur", "BlurStrength", "TextOutline", "OutlineStrength", "OutlineColor", "LetterSpacing", "CustomWindowLayout", "WindowLayoutInitialized", "InnerPaddingX", "InnerPaddingY", "BorderWidth", "BorderColor", "WindowRounding", "ScrollbarLeft", "CustomScrollbar", "ScrollbarWhite", "ScrollbarColor", "ScrollbarOutline", "ScrollbarOutlineColor", "ScrollbarOutlineWidth", "ScrollbarWidth", "ScrollbarOffsetX", "ScrollbarPositionX", "ScrollbarOffsetY", "ScrollbarTopAdjustment", "ScrollbarBottomAdjustment", "ScrollbarDisplay", "LinkTooltips", "ShowNativeButtons", "NativeButtonScale", "NativeButtonFontSize", "NativeButtonOffsetX", "NativeButtonOffsetY", "FontIdType", "FontIdJson" };
         Check(layoutProperties.All(name => Equals(typeof(Settings).GetProperty(name)!.GetValue(resetSettings),
                 typeof(Settings).GetProperty(name)!.GetValue(defaults))),
             "layout reset restores font, frame, scrollbar, links, time and shortcut defaults including legacy placement");
@@ -71,7 +71,7 @@ internal static class RenderCacheChecks
             && ((Array)Get(plugin, "renderedDocuments")!).Length == 0 && ((Array)Get(plugin, "frameDocuments")!).Length == 0
             && ((Array)Get(state, "FilteredDocuments")!).Length == 0 && Get(state, "UnreadDocuments") == null,
             "history clear releases shared and hidden-view caches without drawing any windows");
-        var preferences = new Settings(); Set(plugin, "settings", preferences);
+        var preferences = new Settings { AppearanceMode = ChatAppearanceMode.Custom }; Set(plugin, "settings", preferences);
         var retainedRow = Activator.CreateInstance(rowType, [docs[0]])!; rows.Add(docs[0].Record.Id, retainedRow);
         var updateRender = typeof(Plugin).GetMethod("UpdateRenderSettings", Fields)!;
         var beforeAppearance = RenderSettingsState.Capture(preferences);

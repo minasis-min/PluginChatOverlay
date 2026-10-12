@@ -29,7 +29,7 @@ public sealed partial class Plugin
             var id = FontChoice.Restore(settings.FontIdType, settings.FontIdJson) ?? DalamudDefaultFontAndFamilyId.Instance;
             if (settings.FontIdType.Length > 0) fontName = id.Family.GetLocalizedName("ja-jp") + " / " + id.GetLocalizedName("ja-jp");
             fontAtlas ??= pi.UiBuilder.CreateFontAtlas(FontAtlasAutoRebuildMode.Async, false, "Plugin Chat Overlay fonts");
-            chatFont = new SingleFontSpec { FontId = id, SizePx = settings.FontSize, LetterSpacing = settings.LetterSpacing }.CreateFontHandle(fontAtlas);
+            chatFont = new SingleFontSpec { FontId = id, SizePx = settings.FontSize, LetterSpacing = settings.EffectiveLetterSpacing }.CreateFontHandle(fontAtlas);
         }
         catch (Exception ex) { fontNotice = "フォントを復元できないためDalamud標準フォントを使用します。"; log.Warning(ex, "Chat font unavailable"); }
     }
@@ -71,7 +71,7 @@ public sealed partial class Plugin
             IFontId id = DalamudDefaultFontAndFamilyId.Instance;
             try { id = FontChoice.Restore(settings.FontIdType, settings.FontIdJson) ?? id; }
             catch { /* A missing saved font must not prevent opening the chooser. */ }
-            fontChooser.SelectedFont = new SingleFontSpec { FontId = id, SizePx = settings.FontSize, LetterSpacing = settings.LetterSpacing };
+            fontChooser.SelectedFont = new SingleFontSpec { FontId = id, SizePx = settings.FontSize, LetterSpacing = settings.EffectiveLetterSpacing };
         }
         ImGui.SameLine();
         var changed = UiButton("フォントを標準に戻す");

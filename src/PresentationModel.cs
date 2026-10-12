@@ -137,4 +137,6 @@ internal static class ChatRowGeometry
 {
     public static float Advance(float renderedHeight, float lineHeight, float itemSpacing)
         => Math.Max(lineHeight, renderedHeight) + itemSpacing;
+    public static float ChangeSpacing(float rowHeight, float previousSpacing, float nextSpacing)
+        => rowHeight - previousSpacing + nextSpacing;
 }

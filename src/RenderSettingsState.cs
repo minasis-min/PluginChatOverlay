@@ -2,7 +2,7 @@ namespace PluginChatOverlay;
 
 internal readonly record struct RenderSettingsState(bool ShowTime, bool PadTimestampHour, uint TimestampColor, bool TextOutline, float OutlineStrength)
 {
-    internal static RenderSettingsState Capture(Settings settings) => new(settings.ShowTime, settings.PadTimestampHour, settings.TimestampColor, settings.TextOutline, settings.OutlineStrength);
+    internal static RenderSettingsState Capture(Settings settings) => new(settings.ShowTime, settings.EffectivePadTimestampHour, settings.TimestampColor, settings.UseTextOutline, settings.OutlineStrength);
 }
 
 public sealed partial class Plugin

@@ -18,7 +18,7 @@ public sealed partial class Plugin
         var start = ImGui.GetCursorPos();
         var screen = ImGui.GetCursorScreenPos();
         var available = ImGui.GetContentRegionAvail();
-        var reserved = settings.ScrollbarDisplay == 0 ? 0 : settings.ScrollbarWidth + 3;
+        var reserved = settings.EffectiveScrollbarDisplay == 0 ? 0 : settings.ScrollbarWidth + 3;
         var contentWidth = Math.Max(1, available.X - reserved);
         var windowPosition = ImGui.GetWindowPos(); var windowSize = ImGui.GetWindowSize();
         var bar = ScrollbarGeometry.Place(windowPosition, windowSize,
@@ -30,7 +30,7 @@ public sealed partial class Plugin
         var blockPointer = state.ScrollbarHovered || state.ScrollbarDragging;
         if (blockPointer) View(settings.WindowOf(tab)).HeaderDragging = false;
         if (settings.ScrollbarLeft) ImGui.SetCursorPos(start + new Vector2(reserved, 0));
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, settings.CustomWindowLayout ? Vector2.Zero : ImGui.GetStyle().WindowPadding);
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, settings.UseCustomWindowLayout ? Vector2.Zero : ImGui.GetStyle().WindowPadding);
         ImGui.PushStyleColor(ImGuiCol.ChildBg, Vector4.Zero);
         var child = ImGui.BeginChild("History-" + tab.Id, new(contentWidth, available.Y), false,
             ImGuiWindowFlags.NoScrollbar | (pass ? ImGuiWindowFlags.NoInputs : ImGuiWindowFlags.None));
@@ -63,7 +63,7 @@ public sealed partial class Plugin
 
     private void DrawStandardTabHistory(ChatTab tab, DisplayDocument[] docs, bool pass, ViewState state, double now)
     {
-        var show = settings.ScrollbarDisplay == 2 || now < state.ScrollbarUntil;
+        var show = settings.EffectiveScrollbarDisplay == 2 || now < state.ScrollbarUntil;
         foreach (var color in StandardScrollbarColors)
         {
             var value = ImGui.GetStyle().Colors[(int)color];
@@ -74,7 +74,7 @@ public sealed partial class Plugin
         }
         ImGui.PushStyleColor(ImGuiCol.ChildBg, Vector4.Zero);
         var child = ImGui.BeginChild("History-" + tab.Id, Vector2.Zero, false,
-            (settings.ScrollbarDisplay == 0 ? ImGuiWindowFlags.NoScrollbar : ImGuiWindowFlags.AlwaysVerticalScrollbar)
+            (settings.EffectiveScrollbarDisplay == 0 ? ImGuiWindowFlags.NoScrollbar : ImGuiWindowFlags.AlwaysVerticalScrollbar)
             | (pass ? ImGuiWindowFlags.NoInputs : ImGuiWindowFlags.None));
         try
         {
@@ -101,7 +101,7 @@ public sealed partial class Plugin
         ImGui.PushID(tabId);
         try
         {
-            if (maximum <= 0 || settings.ScrollbarDisplay != 2 && now >= state.ScrollbarUntil && !active) return;
+            if (maximum <= 0 || settings.EffectiveScrollbarDisplay != 2 && now >= state.ScrollbarUntil && !active) return;
             var color = settings.ResolveScrollbarColor(ImGui.GetColorU32(active ? ImGuiCol.ScrollbarGrabActive : hovered ? ImGuiCol.ScrollbarGrabHovered : ImGuiCol.ScrollbarGrab));
             var draw = ImGui.GetWindowDrawList();
             if ((color >> 24) == 0) return;
@@ -180,16 +180,25 @@ public sealed partial class Plugin
         if (state.Selection.Start is { } startPoint && !active.Contains(startPoint.RecordId) || state.Selection.End is { } endPoint && !active.Contains(endPoint.RecordId)) state.Selection.Clear();
         if (state.AnchorId != 0 && !active.Contains(state.AnchorId)) { state.AnchorId = docs.FirstOrDefault()?.Record.Id ?? 0; state.AnchorOffset = 0; }
         if (state.Follow && ImGui.GetScrollY() < ImGui.GetScrollMaxY() - 3) state.Follow = false;
-        var width = Math.Max(1, ImGui.GetContentRegionAvail().X); var spacing = ImGui.GetStyle().ItemSpacing.Y;
+        var width = Math.Max(1, ImGui.GetContentRegionAvail().X);
+        var spacing = settings.ResolveMessageGap(ImGui.GetStyle().ItemSpacing.Y, ImGuiHelpers.GlobalScale);
         var style = new SeStringDrawParams { WrapWidth = width, FontSize = settings.FontSize, LineHeight = settings.LineHeightRatio, Opacity = 1, Color = originalChatColor,
-            Edge = settings.TextOutline, ForceEdgeColor = settings.TextOutline, EdgeColor = settings.TextOutline ? settings.OutlineColor : null,
-            EdgeStrength = settings.TextOutline ? settings.OutlineStrength : null };
+            Edge = settings.UseTextOutline, ForceEdgeColor = settings.UseTextOutline, EdgeColor = settings.UseTextOutline ? settings.OutlineColor : null,
+            EdgeStrength = settings.UseTextOutline ? settings.OutlineStrength : null };
         var lineHeight = MathF.Round(settings.FontSize * settings.LineHeightRatio);
         foreach (var doc in docs)
         {
             if (!state.Rows.TryGetValue(doc.Record.Id, out var row) || !ReferenceEquals(row.Document, doc))
             { row = new(doc); state.Rows[doc.Record.Id] = row; changed = true; }
-            if (row.Width == width && row.FontSize == settings.FontSize && row.LineSpacing == settings.LineSpacing) continue;
+            if (row.Width == width && row.FontSize == settings.FontSize && row.LineSpacing == settings.LineSpacing)
+            {
+                if (row.MessageGap != spacing)
+                {
+                    row.Height = ChatRowGeometry.ChangeSpacing(row.Height, row.MessageGap, spacing);
+                    row.MessageGap = spacing; changed = true;
+                }
+                continue;
+            }
             row.Glyphs = [];
             if (budget-- <= 0) continue;
             var measure = style; measure.TargetDrawList = default(ImDrawListPtr);
@@ -197,6 +206,7 @@ public sealed partial class Plugin
             var result = ImGuiHelpers.SeStringWrapped(doc.Bytes, measure);
             row.Height = ChatRowGeometry.Advance(result.Size.Y, lineHeight, spacing); row.Width = width; row.FontSize = settings.FontSize; changed = true;
             row.LineSpacing = settings.LineSpacing;
+            row.MessageGap = spacing;
         }
         var total = docs.Sum(d => state.Rows[d.Record.Id].Height);
         if (changed && !state.Follow && !state.ScrollbarDragging && state.AnchorId != 0)
@@ -232,6 +242,7 @@ public sealed partial class Plugin
                 var drawStyle = style;
                 var result = ImGuiHelpers.SeStringWrapped(doc.Bytes, drawStyle, pass || blockPointer ? default : new ImGuiId("message"));
                 row.Height = ChatRowGeometry.Advance(result.Size.Y, lineHeight, spacing);
+                row.MessageGap = spacing;
                 if (row.Glyphs.Length == 0 || row.Width != width || row.FontSize != settings.FontSize || row.LineSpacing != settings.LineSpacing) row.Glyphs = fragmentLayout.Copy(doc.Bytes, settings.FontSize, lineHeight);
                 row.Width = width; row.FontSize = settings.FontSize;
                 row.LineSpacing = settings.LineSpacing;

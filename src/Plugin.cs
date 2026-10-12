@@ -96,7 +96,7 @@ public sealed partial class Plugin : IDalamudPlugin
         try { links.CloseTooltip(); }
         finally
         {
-            foreach (var view in views.Values) { view.HeaderDragging = view.ScrollbarDragging = view.ScrollbarHovered = false; view.Selection.EndDrag(); }
+            foreach (var view in views.Values) { view.HeaderDragging = view.AltDragging = view.ScrollbarDragging = view.ScrollbarHovered = false; view.PendingAltFrame = -1; view.Selection.EndDrag(); }
             chatFocused = false; focusedView = null;
             copyInput.CancelRequest(); inputUpdatedAt = 0;
         }
@@ -151,7 +151,7 @@ public sealed partial class Plugin : IDalamudPlugin
             links.EndTooltipFrame();
         }
     }
-    private string Plain(ChatRecord record) => (settings.ShowTime ? ChatClock.Format(record, settings.PadTimestampHour) + " " : "") + record.Plain;
+    private string Plain(ChatRecord record) => (settings.ShowTime ? ChatClock.Format(record, settings.EffectivePadTimestampHour) + " " : "") + record.Plain;
     public void Dispose()
     {
         lock (renderCacheGate) DisposeCore();

@@ -4,12 +4,24 @@ using System.Text.Json.Serialization;
 namespace PluginChatOverlay;
 
 internal enum OverlayUiStyle { Dalamud, Minasis }
+internal enum ChatAppearanceMode { Standard, Custom }
+internal enum ChatBackgroundMode { Normal, Darken }
 
 internal sealed class Settings
 {
     internal const float DefaultConfigWidth = 740;
     internal const float DefaultConfigHeight = 540;
     public OverlayUiStyle UiStyle { get; set; } = OverlayUiStyle.Dalamud;
+    public ChatAppearanceMode AppearanceMode { get; set; }
+    public ChatBackgroundMode BackgroundMode { get; set; }
+    [JsonIgnore] public bool IsCustomAppearance => AppearanceMode == ChatAppearanceMode.Custom;
+    [JsonIgnore] public bool UseCustomWindowLayout => IsCustomAppearance && CustomWindowLayout;
+    [JsonIgnore] public bool UseBackgroundBlur => IsCustomAppearance && BackgroundBlur;
+    [JsonIgnore] public bool UseTextOutline => IsCustomAppearance && TextOutline;
+    [JsonIgnore] public int EffectiveLetterSpacing => IsCustomAppearance ? LetterSpacing : 0;
+    [JsonIgnore] public bool EffectivePadTimestampHour => !IsCustomAppearance || PadTimestampHour;
+    [JsonIgnore] public int EffectiveScrollbarDisplay => IsCustomAppearance ? ScrollbarDisplay : 1;
+    [JsonIgnore] public bool DarkenBackground => IsCustomAppearance && BackgroundMode == ChatBackgroundMode.Darken;
     public bool Enabled { get; set; } // Initial opt-in for this unverified development build.
     public bool Visible { get; set; } = true;
     public bool MainWindowVisible { get; set; } = true;
@@ -18,6 +30,19 @@ internal sealed class Settings
     public float BackgroundAlpha { get; set; } = .8f;
     public float FontSize { get; set; } = 17;
     public int LineSpacing { get; set; }
+    // Logical UI units, captured once so changing the control theme does not
+    // change custom message spacing. UI scale still follows the previous behavior.
+    public float? CustomMessageGap { get; set; }
+    public ChatStyleSnapshot? CustomChatStyle { get; set; }
+    public bool CaptureCustomMessageGap(float themeGap, float scale)
+    {
+        if (!IsCustomAppearance || CustomMessageGap.HasValue) return false;
+        CustomMessageGap = Math.Clamp(themeGap / ValidUiScale(scale), 0, 80);
+        return true;
+    }
+    public float ResolveMessageGap(float themeGap, float scale) => IsCustomAppearance && CustomMessageGap is { } gap
+        ? gap * ValidUiScale(scale) : themeGap;
+    private static float ValidUiScale(float scale) => float.IsFinite(scale) && scale > 0 ? scale : 1;
     [JsonIgnore] public int MinimumLineSpacing => -(int)MathF.Floor(FontSize / 2);
     [JsonIgnore] public float LineHeightRatio => 1f + LineSpacing / FontSize;
     public bool ShowTime { get; set; } = true;
@@ -29,6 +54,7 @@ internal sealed class Settings
     public bool ShowWindowTitle { get; set; } = true;
     public bool ShowTabs { get; set; } = true;
     public bool AllowMove { get; set; } = true;
+    public bool AltDragMove { get; set; } = true;
     public bool AllowResize { get; set; } = true;
     public bool HideDuringCutscene { get; set; } = true;
     public bool HideLoggedOut { get; set; } = true;
@@ -80,17 +106,21 @@ internal sealed class Settings
     [JsonIgnore] public Vector2 Position => new(X, Y);
     [JsonIgnore] public Vector2 Size => new(Width, Height);
     // Retain the saved legacy flag, but direct edits no longer require an opt-in checkbox.
-    [JsonIgnore] public bool UsesCustomScrollbar => CustomScrollbar
+    [JsonIgnore] public bool UsesCustomScrollbar => IsCustomAppearance && (CustomScrollbar
         || ScrollbarLeft || ScrollbarOutline || ScrollbarWidth != 14
         || ScrollbarPositionX.HasValue || ScrollbarOffsetX != 0 || ScrollbarOffsetY != 0
-        || ScrollbarTopAdjustment.GetValueOrDefault() != 0 || ScrollbarBottomAdjustment.GetValueOrDefault() != 0;
-    public uint ResolveScrollbarColor(uint themeColor) => ScrollbarColor ?? (ScrollbarWhite ? 0xFFFFFFFFu : themeColor);
+        || ScrollbarTopAdjustment.GetValueOrDefault() != 0 || ScrollbarBottomAdjustment.GetValueOrDefault() != 0);
+    public uint ResolveScrollbarColor(uint themeColor) => IsCustomAppearance ? ScrollbarColor ?? (ScrollbarWhite ? 0xFFFFFFFFu : themeColor) : themeColor;
     public void ResetLayout()
     {
         var defaults = new Settings();
+        AppearanceMode = defaults.AppearanceMode;
+        BackgroundMode = defaults.BackgroundMode;
         BackgroundAlpha = defaults.BackgroundAlpha;
         FontSize = defaults.FontSize;
         LineSpacing = defaults.LineSpacing;
+        CustomMessageGap = defaults.CustomMessageGap;
+        CustomChatStyle = null;
         ShowTime = defaults.ShowTime;
         PadTimestampHour = defaults.PadTimestampHour;
         TimestampColor = defaults.TimestampColor;
@@ -133,11 +163,15 @@ internal sealed class Settings
     public void Normalize()
     {
         if (!Enum.IsDefined(UiStyle)) UiStyle = OverlayUiStyle.Dalamud;
+        if (!Enum.IsDefined(AppearanceMode)) AppearanceMode = ChatAppearanceMode.Standard;
+        if (!Enum.IsDefined(BackgroundMode)) BackgroundMode = ChatBackgroundMode.Normal;
         ConfigWidth = float.IsFinite(ConfigWidth) ? Math.Clamp(ConfigWidth, 400, 8000) : DefaultConfigWidth;
         ConfigHeight = float.IsFinite(ConfigHeight) ? Math.Clamp(ConfigHeight, 300, 8000) : DefaultConfigHeight;
         BackgroundAlpha = float.IsFinite(BackgroundAlpha) ? Math.Clamp(BackgroundAlpha, 0, 1) : .8f;
         FontSize = float.IsFinite(FontSize) ? Math.Clamp(MathF.Round(FontSize), 10, 36) : 17;
         NormalizeLineSpacing();
+        if (CustomChatStyle != null && !CustomChatStyle.IsValid) CustomChatStyle = null;
+        if (CustomMessageGap is { } gap) CustomMessageGap = float.IsFinite(gap) ? Math.Clamp(gap, 0, 80) : null;
         LetterSpacing = Math.Clamp(LetterSpacing, -2, 12);
         InnerPaddingX = Math.Clamp(InnerPaddingX, 0, 40);
         InnerPaddingY = Math.Clamp(InnerPaddingY, 0, 40);

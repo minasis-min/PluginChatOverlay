@@ -78,7 +78,7 @@ internal static class UiChecks
                 ImGui.Render();
             }
             var appearancePlugin = (Plugin)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(Plugin));
-            var barSettings = new Settings { ScrollbarWidth = 3, ScrollbarWhite = true, ScrollbarDisplay = 2 };
+            var barSettings = new Settings { AppearanceMode = ChatAppearanceMode.Custom, BackgroundMode = ChatBackgroundMode.Darken, ScrollbarWidth = 3, ScrollbarWhite = true, ScrollbarDisplay = 2 };
             const System.Reflection.BindingFlags privateInstance = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             typeof(Plugin).GetField("settings", privateInstance)!.SetValue(appearancePlugin, barSettings);
             var viewType = typeof(Plugin).GetNestedType("ViewState", System.Reflection.BindingFlags.NonPublic)!;
@@ -273,6 +273,48 @@ internal static class UiChecks
             Check(ImGui.GetStyle().Colors[(int)ImGuiCol.Border] == borderBeforeSoft,
                 "soft edge border override restores the shared host style");
             ImGui.Render(); barSettings.BackgroundBlur = false;
+            using (var appearanceUi = new Ui())
+            foreach (var minasis in new[] { false, true })
+            {
+                ImGui.NewFrame();
+                using (minasis ? new OverlayThemeScope(appearanceUi) : null)
+                {
+                    var expectedBackground = ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg];
+                    var expectedPadding = ImGui.GetStyle().WindowPadding;
+                    var expectedRounding = ImGui.GetStyle().WindowRounding;
+                    var expectedBorder = ImGui.GetStyle().WindowBorderSize;
+                    barSettings.AppearanceMode = ChatAppearanceMode.Standard;
+                    barSettings.BackgroundBlur = true; barSettings.CustomWindowLayout = true;
+                    chatWindow.PreDraw();
+                    try
+                    {
+                        Check(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg] == expectedBackground
+                            && ImGui.GetStyle().WindowPadding == expectedPadding && ImGui.GetStyle().WindowRounding == expectedRounding
+                            && ImGui.GetStyle().WindowBorderSize == expectedBorder && chatWindow.AllowBackgroundBlur,
+                            $"standard appearance restores {(minasis ? "Minasis" : "Dalamud")} theme geometry and background while custom values are retained");
+                        ImGui.Begin("Standard appearance check"); ImGui.End();
+                    }
+                    finally { chatWindow.PostDraw(); }
+                    barSettings.AppearanceMode = ChatAppearanceMode.Custom;
+                    foreach (var background in new[] { ChatBackgroundMode.Normal, ChatBackgroundMode.Darken })
+                    {
+                        barSettings.BackgroundMode = background;
+                        chatWindow.PreDraw();
+                        try
+                        {
+                            Check(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg] == (background == ChatBackgroundMode.Normal ? SnapshotColor(barSettings.CustomChatStyle!, ImGuiCol.WindowBg) : new Vector4(0, 0, 0, 1))
+                                && !chatWindow.AllowBackgroundBlur,
+                                $"custom {background} background respects {(minasis ? "Minasis" : "Dalamud")} captured custom background and retained edge blur");
+                            ImGui.Begin("Custom appearance check"); ImGui.End();
+                        }
+                        finally { chatWindow.PostDraw(); }
+                        Check(ImGui.GetStyle().Colors[(int)ImGuiCol.WindowBg] == expectedBackground
+                            && ImGui.GetStyle().WindowPadding == expectedPadding && ImGui.GetStyle().WindowBorderSize == expectedBorder,
+                            $"{background} appearance restores the caller theme after drawing");
+                    }
+                }
+                ImGui.Render();
+            }
             ImGui.NewFrame(); ImGui.Begin("Popup style isolation");
             var normalMenu = ChatPopupStyle.Capture();
             ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(0, 30));
@@ -312,6 +354,29 @@ internal static class UiChecks
             finally { ImGui.PopFont(); ImGui.PopStyleColor(2); ImGui.PopStyleVar(3); ImGui.End(); }
             ImGui.Render();
             using var ui = new Ui(); using var other = new Ui { Theme = UiTheme.Cream };
+            foreach (var scale in new[] { 1f, 1.5f, 2f })
+            {
+                ui.Scale = scale;
+                ImGui.NewFrame();
+                var hostGap = ImGui.GetStyle().ItemSpacing.Y;
+                var customFromHost = new Settings { AppearanceMode = ChatAppearanceMode.Custom };
+                customFromHost.CaptureCustomMessageGap(hostGap, scale);
+                var customFromMinasis = new Settings { AppearanceMode = ChatAppearanceMode.Custom };
+                float minasisGap;
+                using (new OverlayThemeScope(ui))
+                {
+                    minasisGap = ImGui.GetStyle().ItemSpacing.Y;
+                    customFromMinasis.CaptureCustomMessageGap(minasisGap, scale);
+                    Check(Math.Abs(customFromHost.ResolveMessageGap(minasisGap, scale) - hostGap) < .001f,
+                        $"custom messages retain the captured Dalamud gap under Minasis at {scale} scale");
+                    Check(new Settings().ResolveMessageGap(minasisGap, scale) == minasisGap,
+                        $"standard messages retain the previous Minasis theme spacing at {scale} scale");
+                }
+                Check(Math.Abs(customFromMinasis.ResolveMessageGap(hostGap, scale) - minasisGap) < .001f
+                    && ImGui.GetStyle().ItemSpacing.Y == hostGap,
+                    $"custom Minasis spacing survives a return to Dalamud without modifying shared styles at {scale} scale");
+                ImGui.Render();
+            }
             var flag = true; var integer = 17; var number = 80f; var text = "Tab 1"; var index = 1;
             UiChoice[] choices = [new("native", "Dalamud"), new("minasis", "MinasisUI")];
             foreach (var scale in new[] { 1f, 1.5f, 2f })
@@ -399,5 +464,7 @@ internal static class UiChecks
         }
         finally { ImGui.DestroyContext(context); }
     }
+    private static Vector4 SnapshotColor(ChatStyleSnapshot snapshot, ImGuiCol color)
+    { var i = (int)color * 4; return new(snapshot.Colors[i], snapshot.Colors[i + 1], snapshot.Colors[i + 2], snapshot.Colors[i + 3]); }
     private static void Check(bool ok, string name) { if (!ok) throw new Exception(name); Console.WriteLine("PASS " + name); }
 }

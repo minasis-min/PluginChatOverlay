@@ -8,11 +8,14 @@ public sealed partial class Plugin
     {
         public readonly Dictionary<long, RowLayout> Rows = [];
         public readonly TextSelection Selection = new();
-        public bool Follow = true, Jump, ResetGeometry = true, HeaderDragging;
+        public bool Follow = true, Jump, ResetGeometry = true, HeaderDragging, AltDragging;
         public long ReadUpTo, AnchorId;
         public float AnchorOffset;
         public int Unread;
         public Vector2 DragMouseStart, DragWindowStart;
+        public Vector2 LastDragPosition, PendingAltMouse, PendingAltWindow;
+        public int PendingAltFrame = -1;
+        public uint PendingAltRootId;
         public Vector2? RequestedSize;
         public string ActiveTabId = "", RequestedTabId = "";
         public double ScrollbarUntil;
@@ -36,6 +39,7 @@ public sealed partial class Plugin
     {
         public DisplayDocument Document = document;
         public float Width, FontSize, Height = 25;
+        public float MessageGap;
         public int LineSpacing = -1;
         public GlyphBox[] Glyphs = [];
     }

@@ -6,6 +6,8 @@ internal static class AppearanceChecks
 {
     public static void Run()
     {
+        CheckAppearanceMigration();
+        CheckMessageSpacing();
         var legacy = JsonSerializer.Deserialize<Settings>("{\"FontSize\":23,\"LineSpacing\":-4,\"TimestampColor\":4294967295,\"ShowTabs\":false}")!;
         legacy.Normalize();
         Check(legacy.FontSize == 23 && legacy.LineSpacing == -4 && !legacy.ShowTabs
@@ -15,17 +17,17 @@ internal static class AppearanceChecks
             "appearance migration preserves old fonts, line spacing, tabs and time with opt-in effects");
         Check(!legacy.ScrollbarOutline && legacy.ScrollbarOutlineColor == 0xFF8AD5E6 && legacy.ScrollbarOutlineWidth == 1,
             "scrollbar outline defaults off with warm yellow and one pixel thickness");
-        var directBar = new Settings();
+        var directBar = new Settings { AppearanceMode = ChatAppearanceMode.Custom };
         Check(!directBar.UsesCustomScrollbar, "untouched scrollbar keeps the standard renderer");
         directBar.ScrollbarColor = 0x40112233;
         Check(!directBar.CustomScrollbar && !directBar.UsesCustomScrollbar && directBar.ResolveScrollbarColor(uint.MaxValue) == 0x40112233,
             "direct color edits preserve the standard renderer without the legacy customization switch");
-        directBar.ResetLayout(); directBar.ScrollbarPositionX = 0;
+        directBar.ResetLayout(); directBar.AppearanceMode = ChatAppearanceMode.Custom; directBar.ScrollbarPositionX = 0;
         Check(!directBar.CustomScrollbar && directBar.UsesCustomScrollbar,
             "direct position edits including zero take effect without the customization switch");
         directBar.ResetLayout();
         Check(!directBar.UsesCustomScrollbar, "layout reset restores standard scrollbar defaults");
-        var original = new Settings { CustomWindowLayout = true, CustomScrollbar = true, LetterSpacing = -2, TextOutline = true, OutlineColor = 0xFF112233,
+        var original = new Settings { AppearanceMode = ChatAppearanceMode.Custom, CustomWindowLayout = true, CustomScrollbar = true, LetterSpacing = -2, TextOutline = true, OutlineColor = 0xFF112233,
             OutlineStrength = .5f, BackgroundBlur = true, BlurStrength = 2.5f,
             InnerPaddingX = 0, InnerPaddingY = 12, BorderWidth = 0, WindowRounding = 0,
             WindowLayoutInitialized = true, ScrollbarDisplay = 2, ScrollbarLeft = true, ScrollbarWhite = true, ScrollbarWidth = 3,
@@ -46,7 +48,7 @@ internal static class AppearanceChecks
         Check(restored.ScrollbarOutline && restored.ScrollbarOutlineColor == 0x80334455 && restored.ScrollbarOutlineWidth == 2,
             "scrollbar outline color and thickness survive saving without losing alpha");
         Check(new Settings().ResolveScrollbarColor(0x80606060) == 0x80606060
-            && new Settings { ScrollbarWhite = true }.ResolveScrollbarColor(0x80606060) == uint.MaxValue,
+            && new Settings { AppearanceMode = ChatAppearanceMode.Custom, ScrollbarWhite = true }.ResolveScrollbarColor(0x80606060) == uint.MaxValue,
             "legacy scrollbar theme and white colors are preserved until explicitly edited");
         restored.CustomScrollbar = false; restored.Normalize(); restored.CustomScrollbar = true;
         Check(restored.ResolveScrollbarColor(uint.MaxValue) == 0x40112233,
@@ -102,6 +104,70 @@ internal static class AppearanceChecks
         var farRight = ScrollbarGeometry.Place(windowOrigin, windowSize, defaultBar, 200, 3, 20000, 0, 0, 0);
         Check(farRight.Position.X + 3 == windowOrigin.X + windowSize.X,
             "absolute horizontal scrollbar position is bounded by the right window edge");
+    }
+    private static void CheckAppearanceMigration()
+    {
+        var old = SettingsStore.Parse("{\"FontSize\":23,\"LineSpacing\":-4,\"BackgroundAlpha\":0.3,\"UiStyle\":1}");
+        Check(old.AppearanceMode == ChatAppearanceMode.Standard && old.BackgroundMode == ChatBackgroundMode.Normal
+            && old.FontSize == 23 && old.LineSpacing == -4 && old.BackgroundAlpha == .3f && old.UiStyle == OverlayUiStyle.Minasis,
+            "1.0.4 migration retains standard theme background and existing common appearance values");
+        var recent = SettingsStore.Parse("{\"BackgroundBlur\":false}");
+        Check(recent.IsCustomAppearance && recent.DarkenBackground && !recent.UseBackgroundBlur,
+            "1.0.5 migration uses the single always-saved field even when false and preserves its darkened background");
+        var edited = SettingsStore.Parse("{\"BackgroundBlur\":true,\"BlurStrength\":7,\"LetterSpacing\":2,\"CustomWindowLayout\":true,\"InnerPaddingX\":3,\"InnerPaddingY\":11,\"ScrollbarLeft\":true,\"ScrollbarColor\":1074864691,\"ScrollbarWidth\":4,\"TextOutline\":true,\"PadTimestampHour\":false}");
+        Check(edited.UseBackgroundBlur && edited.UseCustomWindowLayout && edited.UseTextOutline
+            && edited.BlurStrength == 7 && edited.EffectiveLetterSpacing == 2 && edited.InnerPaddingX == 3
+            && edited.InnerPaddingY == 11 && edited.UsesCustomScrollbar && edited.ScrollbarWidth == 4
+            && !edited.EffectivePadTimestampHour,
+            "1.0.5 migration keeps edited frame, blur, text, time and scrollbar settings active");
+        var snapshot = JsonSerializer.Serialize(edited);
+        edited.AppearanceMode = ChatAppearanceMode.Standard;
+        Check(!edited.UseBackgroundBlur && !edited.UseCustomWindowLayout && !edited.UseTextOutline
+            && !edited.UsesCustomScrollbar && edited.EffectiveLetterSpacing == 0 && edited.EffectivePadTimestampHour
+            && !edited.DarkenBackground && edited.ResolveScrollbarColor(0xFF123456) == 0xFF123456,
+            "standard mode uses theme defaults without applying retained custom edits");
+        var restored = SettingsStore.Parse(JsonSerializer.Serialize(edited));
+        restored.AppearanceMode = ChatAppearanceMode.Custom;
+        Check(JsonSerializer.Serialize(restored) == snapshot,
+            "custom-standard-save-reload-custom roundtrip retains every edited setting");
+        restored.BackgroundMode = ChatBackgroundMode.Normal;
+        Check(!restored.DarkenBackground && restored.UseBackgroundBlur && restored.ScrollbarWidth == 4,
+            "normal background selection preserves blur and other custom settings");
+        Check(SettingsStore.Parse(JsonSerializer.Serialize(restored)).BackgroundMode == ChatBackgroundMode.Normal,
+            "explicit normal background survives migration checks and reload");
+        Check(new Settings().AppearanceMode == ChatAppearanceMode.Standard && !new Settings().DarkenBackground,
+            "new users default to standard style and normal theme background");
+        restored.AppearanceMode = (ChatAppearanceMode)99; restored.BackgroundMode = (ChatBackgroundMode)99;
+        restored.Normalize();
+        Check(restored.AppearanceMode == ChatAppearanceMode.Standard && restored.BackgroundMode == ChatBackgroundMode.Normal
+            && restored.LetterSpacing == 2 && restored.ScrollbarWidth == 4,
+            "invalid appearance modes fall back safely without deleting custom data");
+    }
+    private static void CheckMessageSpacing()
+    {
+        var migrated = SettingsStore.Parse("{\"BackgroundBlur\":false,\"UiStyle\":1,\"LineSpacing\":-4}");
+        Check(migrated.CustomMessageGap == null && migrated.CaptureCustomMessageGap(15, 1.5f)
+            && migrated.CustomMessageGap == 10 && migrated.LineSpacing == -4,
+            "custom migration captures the previous scaled UI gap without resetting edited line spacing");
+        migrated.UiStyle = OverlayUiStyle.Dalamud;
+        Check(!migrated.CaptureCustomMessageGap(6, 1.5f) && migrated.ResolveMessageGap(6, 1.5f) == 15,
+            "switching control themes cannot replace a captured custom message gap");
+        var restored = SettingsStore.Parse(JsonSerializer.Serialize(migrated));
+        Check(restored.ResolveMessageGap(4, 1) == 10 && restored.ResolveMessageGap(8, 2) == 20 && restored.LineSpacing == -4,
+            "custom gap survives save/reload and follows UI scale independently of the control theme");
+        restored.AppearanceMode = ChatAppearanceMode.Standard;
+        Check(restored.ResolveMessageGap(6, 1.5f) == 6 && !restored.CaptureCustomMessageGap(6, 1.5f)
+            && restored.CustomMessageGap == 10,
+            "standard mode follows the previous theme gap while retaining the custom value");
+        restored.AppearanceMode = ChatAppearanceMode.Custom;
+        Check(restored.ResolveMessageGap(6, 1.5f) == 15, "returning to custom mode restores its captured message gap");
+        Check(ChatRowGeometry.ChangeSpacing(27, 10, 4) == ChatRowGeometry.Advance(17, 17, 4),
+            "cached rows update only the message gap while preserving measured text height");
+        restored.CustomMessageGap = float.NaN; restored.Normalize();
+        Check(restored.CustomMessageGap == null, "invalid stored custom spacing is recaptured instead of contaminating row geometry");
+        restored.CustomMessageGap = 10; restored.ResetLayout();
+        Check(restored.CustomMessageGap == null && restored.AppearanceMode == ChatAppearanceMode.Standard,
+            "explicit layout reset restores standard spacing and clears the custom capture");
     }
     private static void Check(bool ok, string name) { if (!ok) throw new Exception(name); Console.WriteLine("PASS " + name); }
 }

@@ -10,6 +10,7 @@ public sealed partial class Plugin
     private UiHeadingFonts? headingFonts;
     private bool minasisFrame;
     private ChatPopupStyle popupStyle;
+    private readonly ChatStyleSnapshot frameUiStyle = new();
     private uint originalChatColor;
     private static readonly UiChoice[] UiStyles = [new("dalamud", "Dalamud標準"), new("minasis", "MinasisUI")];
 
@@ -18,12 +19,25 @@ public sealed partial class Plugin
     {
         minasisFrame = settings.UiStyle == OverlayUiStyle.Minasis;
         originalChatColor = ImGui.GetColorU32(ImGuiCol.Text);
-        if (!minasisFrame) { popupStyle = ChatPopupStyle.Capture(); return null; }
+        if (!minasisFrame) { InitializeCustomAppearance(); popupStyle = ChatPopupStyle.Capture(frameUiStyle); return null; }
         ui.Theme = UiTheme.SoftCharcoal;
         ui.Scale = ImGuiHelpers.GlobalScale;
         var scope = new OverlayThemeScope(ui);
-        popupStyle = ChatPopupStyle.Capture();
+        InitializeCustomAppearance();
+        popupStyle = ChatPopupStyle.Capture(frameUiStyle);
         return scope;
+    }
+    private void InitializeCustomAppearance()
+    {
+        var captured = settings.CaptureCustomMessageGap(ImGui.GetStyle().ItemSpacing.Y, ImGuiHelpers.GlobalScale);
+        if (settings.IsCustomAppearance && settings.CustomChatStyle == null)
+        {
+            settings.CustomChatStyle = new();
+            settings.CustomChatStyle.Capture(ImGuiHelpers.GlobalScale);
+            captured = true;
+        }
+        if (captured)
+            geometryDirtyAt = Environment.TickCount64;
     }
     private bool DrawUiStyleSettings(bool sidebar = false)
     {
@@ -49,7 +63,7 @@ public sealed partial class Plugin
         }
         if (!sidebar)
         {
-            ImGui.TextWrapped("チャットと設定の外観を切り替えます。本文の色と文字サイズはそのままです。既定はDalamud標準です。");
+            ImGui.TextWrapped("設定画面と標準スタイルの外観を切り替えます。カスタムのチャット外観は保持します。既定はDalamud標準です。");
             UiSection("チャットの表示");
         }
         return changed;

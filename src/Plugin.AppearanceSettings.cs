@@ -22,30 +22,40 @@ public sealed partial class Plugin
         UiSection("背景の縁・内側余白・外枠");
         var alpha = settings.BackgroundAlpha * 100;
         if (UiSlider("背景アルファ (%)", ref alpha, 0, 100)) { settings.BackgroundAlpha = alpha / 100; changed = true; }
-        var blur = settings.BackgroundBlur;
-        if (UiCheckbox("背景の縁をぼかす", ref blur)) { settings.BackgroundBlur = blur; changed = true; }
-        if (blur)
-        {
-            var strength = settings.BlurStrength;
-            if (UiSlider("縁のぼかし幅 (px)", ref strength, .1f, 24, "%.1f")) { settings.BlurStrength = strength; changed = true; }
-        }
-        var customLayout = settings.CustomWindowLayout;
-        if (UiCheckbox("余白・外枠をカスタマイズ", ref customLayout)) { settings.CustomWindowLayout = customLayout; changed = true; }
-        ImGui.BeginDisabled(!customLayout);
+        DrawCustomAppearanceNotice();
+        ImGui.BeginDisabled(!settings.IsCustomAppearance);
         try
         {
-            var x = settings.InnerPaddingX;
-            if (AppearanceInteger("内側余白・横 (px)", ref x, 0, 40)) { settings.InnerPaddingX = x; changed = true; }
-            var y = settings.InnerPaddingY;
-            if (AppearanceInteger("内側余白・縦 (px)", ref y, 0, 40)) { settings.InnerPaddingY = y; changed = true; }
-            var border = settings.BorderWidth;
-            if (AppearanceInteger("外枠の太さ (px)", ref border, 0, 8)) { settings.BorderWidth = border; changed = true; }
-            changed |= AppearanceColor("外枠の色", settings.BorderColor, color => settings.BorderColor = color);
-            var rounding = settings.WindowRounding;
-            if (AppearanceInteger("角丸 (px)", ref rounding, 0, 24)) { settings.WindowRounding = rounding; changed = true; }
-            if (UiButton("余白・外枠を初期値に戻す")) { ResetWindowLayoutDefaults(); changed = true; }
-        } finally { ImGui.EndDisabled(); }
-        ImGui.TextWrapped("既定は従来の余白・外枠です。カスタマイズ時は外枠の太さを0にすると枠を隠せます。");
+            var background = (int)settings.BackgroundMode;
+            if (AppearanceDropdown("chat-background", "背景の描画方式", ref background, BackgroundModes))
+            { settings.BackgroundMode = (ChatBackgroundMode)background; changed = true; }
+            ImGui.TextWrapped("通常はカスタムの基準となる背景色を重ねます。乗算（黒）は背景アルファに応じて背後を暗くします。切り替えても編集値は保持されます。");
+            var blur = settings.BackgroundBlur;
+            if (UiCheckbox("背景の縁をぼかす", ref blur)) { settings.BackgroundBlur = blur; changed = true; }
+            if (blur)
+            {
+                var strength = settings.BlurStrength;
+                if (UiSlider("縁のぼかし幅 (px)", ref strength, .1f, 24, "%.1f")) { settings.BlurStrength = strength; changed = true; }
+            }
+            var customLayout = settings.CustomWindowLayout;
+            if (UiCheckbox("余白・外枠をカスタマイズ", ref customLayout)) { settings.CustomWindowLayout = customLayout; changed = true; }
+            ImGui.BeginDisabled(!customLayout);
+            try
+            {
+                var x = settings.InnerPaddingX;
+                if (AppearanceInteger("内側余白・横 (px)", ref x, 0, 40)) { settings.InnerPaddingX = x; changed = true; }
+                var y = settings.InnerPaddingY;
+                if (AppearanceInteger("内側余白・縦 (px)", ref y, 0, 40)) { settings.InnerPaddingY = y; changed = true; }
+                var border = settings.BorderWidth;
+                if (AppearanceInteger("外枠の太さ (px)", ref border, 0, 8)) { settings.BorderWidth = border; changed = true; }
+                changed |= AppearanceColor("外枠の色", settings.BorderColor, color => settings.BorderColor = color);
+                var rounding = settings.WindowRounding;
+                if (AppearanceInteger("角丸 (px)", ref rounding, 0, 24)) { settings.WindowRounding = rounding; changed = true; }
+                if (UiButton("余白・外枠を初期値に戻す")) { ResetWindowLayoutDefaults(); changed = true; }
+            } finally { ImGui.EndDisabled(); }
+            ImGui.TextWrapped("既定は従来の余白・外枠です。カスタマイズ時は外枠の太さを0にすると枠を隠せます。");
+        }
+        finally { ImGui.EndDisabled(); }
         return changed;
     }
     private bool DrawScrollbarAppearance()
@@ -96,7 +106,8 @@ public sealed partial class Plugin
         var width = settings.ScrollbarWidth;
         if (AppearanceInteger("スクロールバーの幅 (px)", ref width, 2, 24)) { settings.ScrollbarWidth = width; changed = true; }
         var referenceWidth = PrimaryWindowTab?.Width ?? settings.Width;
-        var referencePadding = settings.CustomWindowLayout ? settings.InnerPaddingX : ImGui.GetStyle().WindowPadding.X;
+        var referencePadding = settings.CustomWindowLayout ? settings.InnerPaddingX : settings.IsCustomAppearance && settings.CustomChatStyle is { } customStyle
+            ? customStyle.Metrics[0] * ChatStyleSnapshot.Scale(Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale) : ImGui.GetStyle().WindowPadding.X;
         var offsetX = settings.ScrollbarPositionX ?? (int)MathF.Round(Math.Clamp(settings.ScrollbarLeft ? referencePadding + settings.ScrollbarOffsetX
             : referenceWidth - referencePadding - settings.ScrollbarWidth + settings.ScrollbarOffsetX, 0, Math.Max(0, referenceWidth - settings.ScrollbarWidth)));
         if (AppearanceInteger("スクロールバー横位置・左端から (px)", ref offsetX, 0, 20000)) { settings.ScrollbarPositionX = offsetX; changed = true; }
@@ -127,6 +138,7 @@ public sealed partial class Plugin
     }
     private void ResetWindowLayoutDefaults()
     {
+        using var customBase = settings.IsCustomAppearance ? settings.CustomChatStyle?.Push(Dalamud.Interface.Utility.ImGuiHelpers.GlobalScale) : null;
         var style = ImGui.GetStyle();
         settings.InnerPaddingX = (int)MathF.Round(style.WindowPadding.X);
         settings.InnerPaddingY = (int)MathF.Round(style.WindowPadding.Y);
@@ -147,9 +159,16 @@ public sealed partial class Plugin
         var changed = false;
         var move = settings.AllowMove;
         if (UiCheckbox("チャットの移動を許可", ref move)) { settings.AllowMove = move; changed = true; }
+        var altMove = settings.AltDragMove;
+        ImGui.BeginDisabled(!settings.AllowMove);
+        try
+        {
+            if (UiCheckbox("Alt＋ドラッグで移動", ref altMove)) { settings.AltDragMove = altMove; changed = true; }
+        }
+        finally { ImGui.EndDisabled(); }
         var resize = settings.AllowResize;
         if (UiCheckbox("チャットのサイズ変更を許可", ref resize)) { settings.AllowResize = resize; changed = true; }
-        ImGui.TextWrapped("移動・サイズ変更・タイトルバーの設定はメイン窓と独立窓の両方に適用します。固定・クリック透過中は許可設定より固定が優先されます。");
+        ImGui.TextWrapped("メイン窓と独立窓に適用します。固定中・移動許可OFFではAlt移動も無効です。");
         var primary = PrimaryWindowTab;
         var pinned = primary?.Pinned ?? settings.Pinned;
         if (UiCheckbox("最初の窓を固定（移動・サイズ変更を無効）", ref pinned))
@@ -165,7 +184,7 @@ public sealed partial class Plugin
             if (windowModels.TryGetValue(primary?.Id ?? "main", out var host)) { host.Collapsed = false; host.CollapsedCondition = ImGuiCond.Always; host.RequestFocus = true; }
             changed = true;
         }
-        ImGui.TextWrapped("移動はタイトル（プラグイン名）とタブのドラッグだけです。ログ欄の空白はドラッグしても窓を移動しません。");
+        ImGui.TextWrapped("通常はタイトル・タブをドラッグして移動します。Alt移動ONなら、タイトル・タブがなくてもAlt＋ログ欄のドラッグで移動できます。クリック透過中も使えます。");
         UiSection("スナップ");
         var snap = settings.SnapWindows;
         if (UiCheckbox("画面端・他のチャット窓へスナップ", ref snap)) { settings.SnapWindows = snap; changed = true; }

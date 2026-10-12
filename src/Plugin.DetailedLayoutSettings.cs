@@ -12,8 +12,8 @@ public sealed partial class Plugin
 
     private bool DrawLayoutSettings()
     {
-        if (!ImGui.BeginTabBar("DetailedLayoutTabs")) return false;
-        var changed = false;
+        var changed = DrawAppearanceModeSettings();
+        if (!ImGui.BeginTabBar("DetailedLayoutTabs")) return changed;
         try
         {
             for (var i = 0; i < LayoutPages.Length; i++)
@@ -32,6 +32,45 @@ public sealed partial class Plugin
         return changed;
     }
 
+    private static readonly MinasisUI.UiChoice[] AppearanceModes = [new("standard", "標準（従来のスタイル）"), new("custom", "カスタム")];
+    private static readonly MinasisUI.UiChoice[] BackgroundModes = [new("normal", "通常（基準の背景色）"), new("darken", "乗算（黒）")];
+    private bool DrawAppearanceModeSettings()
+    {
+        var mode = (int)settings.AppearanceMode;
+        var changed = AppearanceDropdown("chat-appearance", "チャットの外観", ref mode, AppearanceModes);
+        if (changed)
+        {
+            settings.AppearanceMode = (ChatAppearanceMode)mode;
+            InitializeCustomAppearance();
+            fontChooser?.Dispose(); fontChooser = null;
+            RebuildChatFont();
+        }
+        ImGui.TextWrapped(settings.IsCustomAppearance
+            ? "編集値を適用し、UI切替でも外観を保持します。"
+            : "選択中のUIの標準スタイルを使用します。");
+        ImGui.TextWrapped("切り替えても編集値は保持されます。");
+        return changed;
+    }
+    private void DrawCustomAppearanceNotice()
+    {
+        if (!settings.IsCustomAppearance)
+            ImGui.TextWrapped("カスタム時のみ編集・適用できます。編集値は保持されます。");
+    }
+    private bool AppearanceDropdown(string id, string label, ref int selected, MinasisUI.UiChoice[] choices)
+    {
+        ImGui.SetNextItemWidth(280 * ImGuiHelpers.GlobalScale);
+        if (minasisFrame) return ui.Dropdown(id, label, ref selected, choices);
+        if (!ImGui.BeginCombo(label + "###" + id, choices[selected].Label)) return false;
+        var changed = false;
+        try
+        {
+            for (var i = 0; i < choices.Length; i++)
+                if (ImGui.Selectable(choices[i].Label, selected == i)) { selected = i; changed = true; }
+        }
+        finally { ImGui.EndCombo(); }
+        return changed;
+    }
+
     private bool DrawLayoutPage(int page)
     {
         var body = ImGui.BeginChild("DetailedLayoutBody-" + page, Vector2.Zero, false);
@@ -41,13 +80,21 @@ public sealed partial class Plugin
             return page switch
             {
                 0 => DrawDetailedWindowAppearance(),
-                1 => DrawScrollbarAppearance(),
+                1 => DrawCustomScrollbarSettings(),
                 2 => DrawChatTextSettings(),
                 3 => DrawChatLinkSettings(),
                 _ => DrawNativeButtonSettings(),
             };
         }
         finally { ImGui.EndChild(); }
+    }
+
+    private bool DrawCustomScrollbarSettings()
+    {
+        DrawCustomAppearanceNotice();
+        ImGui.BeginDisabled(!settings.IsCustomAppearance);
+        try { return DrawScrollbarAppearance(); }
+        finally { ImGui.EndDisabled(); }
     }
 
     private static bool BeginLayoutResetTab()

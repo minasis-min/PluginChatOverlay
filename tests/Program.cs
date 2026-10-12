@@ -130,7 +130,9 @@ CaptureBoundaryChecks.Run();
 RenderCacheChecks.Run();
 SelectionIndexChecks.Run();
 AppearanceChecks.Run();
+AltMoveChecks.Run();
 UiChecks.Run();
+ChatStyleChecks.Run();
 
 static class Probe {
     public static QueueOrigin Origin=null!;

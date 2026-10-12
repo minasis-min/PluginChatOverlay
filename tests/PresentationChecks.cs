@@ -46,7 +46,7 @@ internal static class PresentationChecks
         var morning = record with { ReceivedAt = new DateTimeOffset(new DateTime(2026, 10, 12, 5, 12, 0, DateTimeKind.Local)) };
         Check(ChatClock.Format(morning) == "[05:12]" && ChatClock.Format(morning, false) == "[5:12]"
             && ChatClock.Format(record, false) == "[23:34]", "timestamp formats choose padded or unpadded hour with two-digit minutes");
-        var shortClock = new Settings { PadTimestampHour = false };
+        var shortClock = new Settings { AppearanceMode = ChatAppearanceMode.Custom, PadTimestampHour = false };
         Check(new ReadOnlySeString(DisplayDocument.Content(morning, shortClock, [])).ToMacroString().Contains("[5:12]"),
             "unpadded timestamp choice is applied to displayed history");
         var restoredClock = JsonSerializer.Deserialize<Settings>(JsonSerializer.Serialize(shortClock))!;
