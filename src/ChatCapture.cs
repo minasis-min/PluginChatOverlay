@@ -1,5 +1,4 @@
 using System.Reflection;
-using System.Security.Cryptography;
 using Dalamud.Game.Chat;
 using Dalamud.Plugin.Services;
 using Dalamud.Game.Text.SeStringHandling;
@@ -8,7 +7,6 @@ namespace PluginChatOverlay;
 
 internal sealed class ChatCapture : IDisposable
 {
-    private const string SupportedHash = "C726C1DE70B76A7ACC970F48E29589CD61205F08DAEC9586D112A977583055F5";
     private readonly IChatGui chat;
     private readonly IFramework framework;
     private readonly IPluginLog log;
@@ -18,6 +16,7 @@ internal sealed class ChatCapture : IDisposable
     private bool disposed;
     private bool subscribed;
     public string Status { get; private set; } = "未初期化";
+    public string CompatibilityDiagnostic { get; private set; } = "未確認";
     public bool Compatible => origin != null && subscribed && !disposed;
     public long QueueMatches { get; private set; }
     public long Captured { get; private set; }
@@ -31,21 +30,26 @@ internal sealed class ChatCapture : IDisposable
         try
         {
             var assembly = typeof(IChatGui).Assembly;
-            var hash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assembly.Location)));
-            if (assembly.GetName().Version != new Version(15, 0, 3, 6) || hash != SupportedHash)
-                throw new NotSupportedException("Dalamud DLLが調査済み15.0.3.6と一致しません。");
+            if (assembly.GetName().Version?.Major != 15)
+                throw new NotSupportedException("Dalamud APIの世代が未対応です。");
             var type = assembly.GetType("Dalamud.Game.Gui.ChatGui", true)!;
             var flags = BindingFlags.Instance | BindingFlags.NonPublic;
             var detour = type.GetMethod("HandlePrintMessageDetour", flags)!;
             var update = type.GetMethod("UpdateQueue", flags)!;
             if (detour == null || update == null) throw new MissingMethodException("チャット経路が未対応です。");
+            var detourFingerprint = MethodCompatibility.Fingerprint(detour);
+            var queueFingerprint = MethodCompatibility.Fingerprint(update);
+            CompatibilityDiagnostic = ChatCompatibility.Diagnose(detourFingerprint, queueFingerprint);
+            if (!ChatCompatibility.MatchesFingerprints(detourFingerprint, queueFingerprint))
+                throw new NotSupportedException(CompatibilityDiagnostic);
             origin = new(detour, update);
-            Status = "15.0.3.6: キュー経路確認方式";
+            Status = "チャット処理の互換性確認済み: キュー経路確認方式";
             chat.CheckMessageHandled += Check;
             subscribed = true;
         }
         catch (Exception ex)
         {
+            if (CompatibilityDiagnostic == "未確認") CompatibilityDiagnostic = "非互換／確認失敗: " + ex.GetType().Name + "。" + ex.Message;
             Cleanup.Run(error => log.Warning(error, "Partial chat initialization cleanup failed"),
                 () => chat.CheckMessageHandled -= Check);
             Status = "分離停止: " + ex.Message; log.Warning(ex, "Chat separation unavailable; vanilla output is preserved");

@@ -9,6 +9,8 @@ internal static class TooltipChecks
 {
     public static void Run()
     {
+        Check(NativeTooltipCompatibility.Compatible, "native tooltip layout and API contract match");
+        Check(!NativeTooltipCompatibility.Matches("changed"), "changed tooltip contract stays rejected");
         var backend = new Backend(); var hover = new TooltipHover(backend);
         var normal = TooltipItem.From(new ItemPayload(100u));
         var hq = TooltipItem.From(new ItemPayload(100u, ItemKind.Hq));
@@ -68,7 +70,7 @@ internal static class TooltipChecks
             && keyArgs.ItemArgs.ItemId == 2000001 && keyArgs.ItemArgs.Kind == FFXIVClientStructs.FFXIV.Client.Enums.DetailKind.KeyItem
             && hqArgs.ItemArgs.BuyQuantity == -1 && hqArgs.ItemArgs.Flag1 == 0,
             "typed tooltip-manager arguments preserve HQ and key-item identity without agent mutation");
-        Check(typeof(AgentItemDetail).Module.ModuleVersionId == new Guid("7fda2a82-4ca8-49d0-9687-4c8eac011509")
+        Check(NativeTooltipCompatibility.Compatible
             && Marshal.SizeOf<FFXIVClientStructs.FFXIV.Component.GUI.AtkTooltipManager.AtkTooltipArgs>() == 0x18,
             "tooltip-manager adapter matches installed module and argument structure");
         using var module = Mono.Cecil.ModuleDefinition.ReadModule(typeof(NativeItemTooltip).Assembly.Location);

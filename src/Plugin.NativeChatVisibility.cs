@@ -28,13 +28,13 @@ internal sealed class NativeChatVisibility
 {
     private static readonly byte[] ExpectedCodeHash = Convert.FromHexString("D9BA914720750392F49ADFF21C2A727A1C6BA7169466007644AD62F43C21F161");
     private static readonly string[] Panels = ["ChatLogPanel_0", "ChatLogPanel_1", "ChatLogPanel_2", "ChatLogPanel_3"];
-    private static readonly int VisibleOffset = Marshal.OffsetOf<AtkUnitBase>(nameof(AtkUnitBase.Flags198)).ToInt32();
-    private static readonly int PanelZoomOffset = Marshal.OffsetOf<AddonChatLogPanel>(nameof(AddonChatLogPanel.LogViewer)).ToInt32()
-        + Marshal.OffsetOf<LogViewer>(nameof(LogViewer.IsMaximized)).ToInt32();
+    private const int VisibleOffset = 0x198;
+    private const int PanelZoomOffset = 0x3A0;
     private const int MainZoomOffset = 0x5E8;
     private long sampledAt;
     private bool expanded;
     public bool? Compatible { get; private set; }
+    public string Diagnostic { get; private set; } = "未確認（機能が有効な状態でログイン後に確認）";
 
     public bool IsExpanded(IGameGui game)
     {
@@ -53,23 +53,32 @@ internal sealed class NativeChatVisibility
             }
             return expanded;
         }
-        catch
+        catch (Exception ex)
         {
             // A failed compatibility check must not repeat reflection/signature work every tick.
             Compatible ??= false;
+            Diagnostic = "非互換／確認失敗: " + ex.GetType().Name;
             expanded = false; return false;
         }
     }
 
-    private static unsafe bool VerifyLayout()
+    private unsafe bool VerifyLayout()
     {
         // Read, never invoke, the SDK-resolved function. Its complete machine-code
         // fingerprint pins the independently inspected main flag at 0x5E8 and
         // panel LogViewer.IsMaximized field to the supported game executable.
         Span<byte> code = stackalloc byte[181];
-        return VisibleOffset == 0x198 && PanelZoomOffset == 0x3A0
-            && SafeProcessMemory.Read((nint)AddonChatLog.MemberFunctionPointers.IsZoomed, code)
-            && MatchesCode(code);
+        // Resolve field metadata inside the guarded check, not a type initializer:
+        // a renamed SDK field must disable this feature rather than prevent plugin loading.
+        if (Marshal.OffsetOf<AtkUnitBase>(nameof(AtkUnitBase.Flags198)).ToInt32() != VisibleOffset
+            || Marshal.OffsetOf<AddonChatLogPanel>(nameof(AddonChatLogPanel.LogViewer)).ToInt32()
+                + Marshal.OffsetOf<LogViewer>(nameof(LogViewer.IsMaximized)).ToInt32() != PanelZoomOffset)
+        { Diagnostic = "非互換: チャット拡大状態のSDK項目位置が変更されています。"; return false; }
+        if (!SafeProcessMemory.Read((nint)AddonChatLog.MemberFunctionPointers.IsZoomed, code))
+        { Diagnostic = "確認失敗: IsZoomedの処理内容を読み取れません。"; return false; }
+        if (!MatchesCode(code))
+        { Diagnostic = "非互換: IsZoomedの処理内容が変更されています。自動非表示を停止します。"; return false; }
+        Diagnostic = "互換性あり"; return true;
     }
 
     internal static bool MatchesCode(ReadOnlySpan<byte> code)

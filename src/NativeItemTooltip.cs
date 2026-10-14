@@ -22,14 +22,22 @@ internal sealed unsafe class NativeItemTooltip : IItemTooltipBackend
     public NativeItemTooltip(IGameGui game, IPluginLog log, IFramework framework)
     {
         this.game = game; this.log = log; this.framework = framework;
+        if (!Compatible) log.Debug("Native tooltip API incompatibility: {Reason}", NativeTooltipCompatibility.Diagnostic);
         cleanupRetry = new(TryCleanup,
             (action, delay) => { _ = framework.RunOnTick(action, delay, 1); },
             ex => log.Warning(ex, "Native tooltip cleanup deferred; retrying on framework ticks"));
     }
-    // Version-pinned client bindings; the standard tooltip manager owns item-detail state.
-    private static readonly Guid SupportedModule = new("7fda2a82-4ca8-49d0-9687-4c8eac011509");
-    private static bool Compatible => typeof(AgentItemDetail).Module.ModuleVersionId == SupportedModule;
-    private string status = Compatible ? "" : "ネイティブツールチップ: FFXIVClientStructsの版が未対応です。";
+    // Validate used fields/API signatures, not a particular SDK build identifier.
+    private static bool Compatible => NativeTooltipCompatibility.Compatible;
+    // Do not enter a native call while the host's signature resolver is still initializing.
+    private static bool FunctionsReady => (nint)AtkStage.StaticAddressPointers.ppInstance != 0
+        && (nint)IMemorySpace.MemberFunctionPointers.GetUISpace != 0
+        && (nint)AtkResNode.MemberFunctionPointers.Ctor != 0
+        && (nint)AtkTooltipManager.MemberFunctionPointers.AttachTooltip != 0
+        && (nint)AtkTooltipManager.MemberFunctionPointers.ShowTooltip != 0
+        && (nint)AtkTooltipManager.MemberFunctionPointers.HideTooltip != 0
+        && (nint)AtkTooltipManager.MemberFunctionPointers.DetachTooltip != 0;
+    private string status = Compatible ? "" : "ネイティブツールチップ: 必要な構造またはAPIが変更されています。";
     public string Status
     {
         get => cleanupRetry.Pending ? "ネイティブツールチップの終了処理を再試行中です。完了するまで新しい表示を待機します。" : status;
@@ -120,6 +128,11 @@ internal sealed unsafe class NativeItemTooltip : IItemTooltipBackend
             {
                 releaseRequested = true; RequestCleanup();
                 if (cleanupRetry.Pending) return false;
+            }
+            if (!FunctionsReady)
+            {
+                Status = "ネイティブツールチップ: ゲームUIの初期化を待っています。";
+                return false;
             }
             var stage = AtkStage.Instance();
             var parent = (AtkUnitBase*)game.GetAddonByName("ChatLog", 1).Address;

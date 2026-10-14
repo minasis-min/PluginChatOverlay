@@ -1,16 +1,16 @@
 {
   "Name": "Plugin Chat Overlay",
   "InternalName": "PluginChatOverlay",
-  "AssemblyVersion": "1.0.6.0",
+  "AssemblyVersion": "1.0.7.0",
   "DalamudApiLevel": 15,
   "Punchline": "プラグイン通知をタブ分け可能な専用オーバーレイウィンドウに分離します。",
   "Description": "プラグイン通知をタブ分け可能な専用オーバーレイウィンドウに分離します。\n分離は初期OFFです。",
-  "ApplicableVersion": "2026.09.15.0000.0000",
+  "ApplicableVersion": "any",
   "Tags": [
     "chat",
     "overlay"
   ],
   "Author": "min",
-  "IconUrl": "https://github.com/minasis-min/PluginChatOverlay/releases/download/v1.0.6.0/icon.png",
+  "IconUrl": "https://github.com/minasis-min/PluginChatOverlay/releases/download/v1.0.7.0/icon.png",
   "RepoUrl": "https://github.com/minasis-min/PluginChatOverlay"
 }

@@ -129,6 +129,7 @@ CleanupChecks.Run();
 CaptureBoundaryChecks.Run();
 RenderCacheChecks.Run();
 SelectionIndexChecks.Run();
+CompatibilityChecks.Run();
 AppearanceChecks.Run();
 AltMoveChecks.Run();
 UiChecks.Run();

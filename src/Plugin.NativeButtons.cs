@@ -14,7 +14,8 @@ public sealed partial class Plugin
 
     private unsafe void DrawNativeChatButtons()
     {
-        if (!settings.ShowNativeButtons) return;
+        if (!settings.ShowNativeButtons || !NativeTooltipCompatibility.Compatible
+            || (nint)AtkUnitBase.MemberFunctionPointers.GetNodeById == 0) return;
         var addon = (AtkUnitBase*)game.GetAddonByName("ChatLog", 1).Address;
         if (addon == null || !addon->IsVisible) return;
         var node = addon->GetNodeById(ChatLogCloseNodeId);

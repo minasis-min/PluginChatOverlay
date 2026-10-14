@@ -24,6 +24,7 @@ internal sealed class FragmentLayout
     private Dictionary<string, PropertyInfo>? properties;
     private bool failed;
     public string Status { get; private set; } = "";
+    public string CompatibilityDiagnostic => failed ? Status : renderer == null ? "未確認（本文の描画時に確認）" : "互換性あり";
     public unsafe GlyphBox[] Copy(byte[] bytes, float fontSize, float lineHeight)
     {
         if (failed) return [];
@@ -40,6 +41,9 @@ internal sealed class FragmentLayout
             var previous = default(Rune);
             foreach (var fragment in copied)
             {
+                if (fragment.From < 0 || fragment.To < fragment.From || fragment.To > bytes.Length
+                    || !float.IsFinite(fragment.Offset.X) || !float.IsFinite(fragment.Offset.Y))
+                    throw new NotSupportedException("文章の配置情報が無効です。");
                 var x = 0f; var lastRune = previous;
                 foreach (var unit in UtfEnumerator.From(bytes.AsSpan(fragment.From, fragment.To - fragment.From), UtfEnumeratorFlags.Utf8SeString))
                 {
@@ -80,14 +84,29 @@ internal sealed class FragmentLayout
     {
         if (renderer != null) return;
         var assembly = typeof(IChatGui).Assembly;
-        if (assembly.ManifestModule.ModuleVersionId != new Guid("9a6f3e4f-c2f0-46f4-b211-7013dde20a8b"))
-            throw new NotSupportedException("このDalamud版は文章選択の内部配置読取に未対応です。");
         var type = assembly.GetType("Dalamud.Interface.ImGuiSeStringRenderer.Internal.SeStringRenderer", true)!;
-        var service = assembly.GetType("Dalamud.Service`1", true)!.MakeGenericType(type);
-        renderer = service.GetMethod("Get", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null)!;
-        fragments = type.GetField("fragmentsMainThread", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var fragmentType = assembly.GetType("Dalamud.Interface.ImGuiSeStringRenderer.Internal.TextFragment", true)!;
+        if (!SupportsSchema(type, fragmentType)) throw new NotSupportedException("文章選択に必要な配置情報の構造が変更されています。");
+        var service = assembly.GetType("Dalamud.Service`1", true)!.MakeGenericType(type);
+        var value = service.GetMethod("Get", BindingFlags.Public | BindingFlags.Static)!.Invoke(null, null)
+            ?? throw new NotSupportedException("文章描画の初期化を待っています。");
+        fragments = type.GetField("fragmentsMainThread", BindingFlags.NonPublic | BindingFlags.Instance)!;
         properties = new[] { "From", "To", "Offset", "LastRune", "IsSoftHyphenVisible" }.ToDictionary(n => n, n => fragmentType.GetProperty(n)!);
+        renderer = value;
+    }
+    internal static bool SupportsSchema(Type rendererType, Type fragmentType)
+    {
+        var field = rendererType.GetField("fragmentsMainThread", BindingFlags.NonPublic | BindingFlags.Instance);
+        if (field == null || !typeof(IEnumerable).IsAssignableFrom(field.FieldType)
+            || !field.FieldType.GenericTypeArguments.Contains(fragmentType)) return false;
+        foreach (var pair in new[] { ("From", typeof(int)), ("To", typeof(int)), ("Offset", typeof(Vector2)),
+                     ("LastRune", typeof(Rune)), ("IsSoftHyphenVisible", typeof(bool)) })
+        {
+            var property = fragmentType.GetProperty(pair.Item1);
+            if (property?.PropertyType != pair.Item2 || property.GetMethod is not { IsPublic: true, IsStatic: false }
+                || property.GetIndexParameters().Length != 0) return false;
+        }
+        return true;
     }
     private readonly record struct Fragment(int From, int To, Vector2 Offset, Rune LastRune, bool SoftHyphen);
     internal static int Caret(GlyphBox[] glyphs, Vector2 point, int textLength)

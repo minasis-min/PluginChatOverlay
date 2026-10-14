@@ -17,6 +17,8 @@ public sealed partial class Plugin
     private bool windowSizeEdited;
     private int editedFontSize;
     private bool fontSizeEdited;
+    private static readonly string CompatibilityVersions = "Dalamud " + typeof(Dalamud.Plugin.Services.IChatGui).Assembly.GetName().Version
+        + " / FFXIVClientStructs " + typeof(FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase).Assembly.GetName().Version;
     private void ResetWindowGeometry()
     {
         settings.ResetGeometry(); resetGeometry = true;
@@ -46,6 +48,14 @@ public sealed partial class Plugin
     }
     private void DrawDiagnostics()
     {
+        UiSection("API互換性（Debug）");
+        ImGui.TextUnformatted(CompatibilityVersions);
+        ImGui.TextWrapped("通知分離: " + capture.CompatibilityDiagnostic);
+        ImGui.TextWrapped("ネイティブツールチップ: " + NativeTooltipCompatibility.Diagnostic);
+        if (links.TooltipStatus.Length > 0) ImGui.TextWrapped(links.TooltipStatus);
+        ImGui.TextWrapped("チャット拡大中の非表示: " + nativeChatVisibility.Diagnostic);
+        ImGui.TextWrapped("文章選択: " + fragmentLayout.CompatibilityDiagnostic);
+        UiSection("動作状況");
         ImGui.TextWrapped(capture.Status);
         ImGui.TextWrapped("他プラグインが先に非表示にしたログは捕捉しません。");
         if (uiFault)

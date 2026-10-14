@@ -87,7 +87,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.6: 標準／カスタムの外観切替、Alt＋ドラッグ移動を追加。カスタムの外観をUI切替後も保持し、行の間隔とログ同士の間隔を個別に調整可能。設定移行と入力・描画の不具合を修正。'
+$taskEntry.Changelog = '1.0.7: ゲーム・Dalamud更新時の互換性チェックを見直し、必要な処理・構造・APIが変わらなければ継続動作するよう改善。ツールチップ・文章選択の互換性判定と、Debugでの確認結果・不一致理由表示を追加。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"
