@@ -90,7 +90,7 @@ internal static class MethodCompatibility
         if (type.IsPointer) return TypeName(type.GetElementType()!) + "*";
         if (type.IsArray) return TypeName(type.GetElementType()!) + "[" + new string(',', type.GetArrayRank() - 1) + "]";
         if (type.IsFunctionPointer) return "fn[" + type.IsUnmanagedFunctionPointer + ";"
-            + string.Join(",", type.GetFunctionPointerCallingConventions().Select(TypeName)) + "](" 
+            + string.Join(",", type.GetFunctionPointerCallingConventions().Select(TypeName)) + "]("
             + string.Join(",", type.GetFunctionPointerParameterTypes().Select(TypeName)) + "):" + TypeName(type.GetFunctionPointerReturnType());
         if (type.IsGenericParameter) return (type.DeclaringMethod == null ? "!" : "!!") + type.GenericParameterPosition;
         if (type.IsGenericType) return type.GetGenericTypeDefinition().FullName + "<" + string.Join(",", type.GetGenericArguments().Select(TypeName)) + ">";
