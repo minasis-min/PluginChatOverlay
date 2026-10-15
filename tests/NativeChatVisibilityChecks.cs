@@ -21,6 +21,27 @@ internal static class NativeChatVisibilityChecks
             "invalid native memory returns failure without dereferencing it");
         Check(!NativeChatVisibility.MatchesCode(new byte[181]) && !NativeChatVisibility.MatchesCode([]),
             "unknown or incomplete game code cannot enable expansion flag reads");
+        var sample = new byte[181];
+        sample[90] = 0xE8;
+        Span<byte> firstHash = stackalloc byte[32];
+        Span<byte> changedHash = stackalloc byte[32];
+        Check(NativeChatVisibility.TryHashCode(sample, firstHash), "complete inspected CALL layout can be fingerprinted");
+        for (var i = 91; i < 95; i++) sample[i] = (byte)i;
+        Check(NativeChatVisibility.TryHashCode(sample, changedHash) && firstHash.SequenceEqual(changedHash),
+            "moving the unused relative CALL target does not disable expansion detection");
+        Check(sample[91] == 91 && sample[94] == 94, "code fingerprinting does not modify its input");
+        sample[90] = 0xE9;
+        Check(!NativeChatVisibility.TryHashCode(sample, changedHash), "a changed CALL opcode is rejected");
+        sample[90] = 0xE8;
+        foreach (var index in Enumerable.Range(0, sample.Length).Where(i => i < 91 || i > 94))
+        {
+            sample[index] ^= 1;
+            Check(!NativeChatVisibility.TryHashCode(sample, changedHash) || !firstHash.SequenceEqual(changedHash),
+                "changing checked game code byte " + index + " changes or rejects the fingerprint");
+            sample[index] ^= 1;
+        }
+        Check(!NativeChatVisibility.TryHashCode(sample.AsSpan(0, 180), changedHash)
+            && !NativeChatVisibility.TryHashCode(sample, changedHash[..31]), "incomplete code and digest buffers are rejected");
         var memory = Marshal.AllocHGlobal(0x638);
         try
         {

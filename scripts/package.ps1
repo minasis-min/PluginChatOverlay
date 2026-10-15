@@ -87,7 +87,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.7: ゲーム・Dalamud更新時の互換性チェックを見直し、必要な処理・構造・APIが変わらなければ継続動作するよう改善。ツールチップ・文章選択の互換性判定と、Debugでの確認結果・不一致理由表示を追加。'
+$taskEntry.Changelog = '1.0.8: ゲーム更新後に停止していたチャット拡大中の自動非表示を修正。リンク操作の案内が残り続ける問題を修正し、操作できなかったリンクの名前・種類をチャットログに表示。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"

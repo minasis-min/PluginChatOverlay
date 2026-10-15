@@ -26,7 +26,7 @@ public sealed partial class Plugin
 
 internal sealed class NativeChatVisibility
 {
-    private static readonly byte[] ExpectedCodeHash = Convert.FromHexString("D9BA914720750392F49ADFF21C2A727A1C6BA7169466007644AD62F43C21F161");
+    private static readonly byte[] ExpectedCodeHash = Convert.FromHexString("405954B4C96003CF1F1406C0F5F9E62E6ED2383A74B3E17A7868AD7C8ED16BF6");
     private static readonly string[] Panels = ["ChatLogPanel_0", "ChatLogPanel_1", "ChatLogPanel_2", "ChatLogPanel_3"];
     private const int VisibleOffset = 0x198;
     private const int PanelZoomOffset = 0x3A0;
@@ -64,9 +64,9 @@ internal sealed class NativeChatVisibility
 
     private unsafe bool VerifyLayout()
     {
-        // Read, never invoke, the SDK-resolved function. Its complete machine-code
-        // fingerprint pins the independently inspected main flag at 0x5E8 and
-        // panel LogViewer.IsMaximized field to the supported game executable.
+        // Read, never invoke, the SDK-resolved function. Its fingerprint pins the
+        // inspected flag offsets and control flow. Only the relative displacement
+        // of the unused internal CALL is excluded; no game function is executed.
         Span<byte> code = stackalloc byte[181];
         // Resolve field metadata inside the guarded check, not a type initializer:
         // a renamed SDK field must disable this feature rather than prevent plugin loading.
@@ -83,10 +83,21 @@ internal sealed class NativeChatVisibility
 
     internal static bool MatchesCode(ReadOnlySpan<byte> code)
     {
-        if (code.Length != 181) return false;
         Span<byte> hash = stackalloc byte[32];
-        SHA256.HashData(code, hash);
-        return hash.SequenceEqual(ExpectedCodeHash);
+        return TryHashCode(code, hash) && hash.SequenceEqual(ExpectedCodeHash);
+    }
+
+    internal static bool TryHashCode(ReadOnlySpan<byte> code, Span<byte> hash)
+    {
+        // The inspected 181-byte function has one E8 rel32 CALL at byte 90.
+        // Its destination can move between builds without changing the flag reads.
+        // Keep the opcode, every field displacement, and every other byte checked.
+        if (code.Length != 181 || code[90] != 0xE8 || hash.Length < 32) return false;
+        Span<byte> normalized = stackalloc byte[181];
+        code.CopyTo(normalized);
+        normalized.Slice(91, 4).Clear();
+        SHA256.HashData(normalized, hash);
+        return true;
     }
 
     internal static bool ReadExpanded(nint addon, int zoomOffset)
