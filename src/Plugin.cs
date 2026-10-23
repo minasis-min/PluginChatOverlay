@@ -25,6 +25,9 @@ public sealed partial class Plugin : IDalamudPlugin
     private readonly Settings settings;
     private readonly History history = new();
     private readonly ChatCapture capture;
+    private readonly GameLogCapture gameCapture;
+    private readonly GameLogCatalog gameLogCatalog;
+    private volatile GameLogSelection gameCopySelection = GameLogSelection.Empty;
     private readonly Links links;
     private readonly Dictionary<long, DisplayDocument> documents = [];
     private readonly Dictionary<string, ViewState> views = [];
@@ -44,7 +47,7 @@ public sealed partial class Plugin : IDalamudPlugin
 
     public Plugin(IDalamudPluginInterface pi, ICommandManager commands, IChatGui chat,
         IFramework framework, IGameGui game, IDataManager data, IKeyState keyState, IClientState clientState, IPluginLog log,
-        IAddonLifecycle addonLifecycle, IGameConfig gameConfig)
+        IAddonLifecycle addonLifecycle, IGameConfig gameConfig, ISeStringEvaluator seStringEvaluator)
     {
         this.pi = pi; this.commands = commands; this.chat = chat; this.log = log;
         this.framework = framework; this.keyState = keyState;
@@ -58,6 +61,9 @@ public sealed partial class Plugin : IDalamudPlugin
         try { settings = store.Load(); }
         catch (Exception ex) { settings = new(); saveNotice = "設定読込失敗。既定値で起動しました。"; log.Error(ex, "Settings load failed"); }
         history.ApplyLimit(settings.HistoryLimit);
+        history.ApplyGameLimit(settings.GameHistoryLimit);
+        gameLogCatalog = GameLogCatalog.Load(data, log);
+        UpdateGameLogSelection();
         links = new(chat, game, log, framework);
         palette = new(data, log);
         try
@@ -69,6 +75,10 @@ public sealed partial class Plugin : IDalamudPlugin
             commandRegistered = commands.AddHandler(Command, new CommandInfo(OnCommand) { HelpMessage = "Plugin Chat Overlay: show / config / on / off / reset / test" });
             if (!commandRegistered) throw new InvalidOperationException(Command + " は既に使用されています。");
             capture = new(chat, framework, log, history, () => settings.Enabled && !uiFault);
+            var gameFormatter = new GameLogFormatter(data, seStringEvaluator);
+            gameCapture = new(chat, framework, log, history,
+                () => settings.CopyGameLogs && gameLogCatalog.Available && capture.Compatible && !uiFault,
+                capture.ClassifyCurrentCall, WantsGameLog, gameFormatter.Format);
             links.InitializeTooltips(addonLifecycle, gameConfig);
             pi.UiBuilder.Draw += Draw;
             pi.UiBuilder.HideUi += StopWindowDrags;
@@ -105,7 +115,7 @@ public sealed partial class Plugin : IDalamudPlugin
     private void OpenMain() { settings.Visible = true; if (PrimaryWindowTab is { } root) root.Visible = true; else settings.MainWindowVisible = true; Save(); }
     private void Save()
     {
-        try { store.Save(settings); saveNotice = ""; }
+        try { UpdateGameLogSelection(); store.Save(settings); saveNotice = ""; }
         catch (Exception ex) { saveNotice = "設定を保存できませんでした。"; log.Error(ex, "Settings save failed"); }
     }
     private void Draw()
@@ -151,6 +161,8 @@ public sealed partial class Plugin : IDalamudPlugin
             links.EndTooltipFrame();
         }
     }
+    private void UpdateGameLogSelection() => gameCopySelection = gameLogCatalog.BuildSelection(settings.Tabs.Select(t => t.GameLogs));
+    private bool WantsGameLog(int kind, int source, int target) => gameCopySelection.Matches(kind, source, target);
     private string Plain(ChatRecord record) => (settings.ShowTime ? ChatClock.Format(record, settings.EffectivePadTimestampHour) + " " : "") + record.Plain;
     public void Dispose()
     {
@@ -167,6 +179,7 @@ public sealed partial class Plugin : IDalamudPlugin
             () => pi.UiBuilder.OpenMainUi -= OpenMain,
             () => pi.UiBuilder.HideUi -= StopWindowDrags,
             () => pi.ActivePluginsChanged -= PluginsChanged,
+            () => gameCapture?.Dispose(),
             () => capture?.Dispose(),
             () => links.DisposeTooltips(),
             () => fontChooser?.Dispose(),

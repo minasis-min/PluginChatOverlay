@@ -35,8 +35,12 @@ public sealed partial class Plugin
             foreach (var state in views.Values)
             {
                 state.Documents = []; state.DocumentIds = []; state.ActiveIds = [];
-                state.RequestedScroll = null;
-                state.ScrollbarDragging = state.ScrollbarHovered = false; state.ScrollMaximum = 0;
+                // Ordinary eviction must not interrupt a drag or discard queued user input.
+                if (live.Count == 0)
+                {
+                    state.RequestedScroll = null;
+                    state.ScrollbarDragging = state.ScrollbarHovered = false; state.ScrollMaximum = 0;
+                }
                 state.DocumentIndices.Clear();
                 state.FilterSource = null; state.FilteredDocuments = []; state.UnreadDocuments = null;
                 foreach (var id in state.Rows.Keys.Where(id => !live.Contains(id)).ToArray()) state.Rows.Remove(id);
@@ -49,7 +53,7 @@ public sealed partial class Plugin
     private DisplayDocument Document(ChatRecord record)
     {
         if (documents.TryGetValue(record.Id, out var cached) && ReferenceEquals(cached.Record, record) && cached.Revision == presentationRevision) return cached;
-        var plugin = tags.Resolve(SeString.Parse(record.Body).TextValue);
+        var plugin = record.Origin == ChatRecordOrigin.Game ? "" : tags.Resolve(SeString.Parse(record.Body).TextValue);
         if (plugin.Length > 0) recognised.Add(plugin);
         var doc = new DisplayDocument(record, plugin, settings, palette, presentationRevision);
         doc.CacheText(); documents[record.Id] = doc; return doc;

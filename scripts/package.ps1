@@ -87,7 +87,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.8: ゲーム更新後に停止していたチャット拡大中の自動非表示を修正。リンク操作の案内が残り続ける問題を修正し、操作できなかったリンクの名前・種類をチャットログに表示。'
+$taskEntry.Changelog = '1.0.9: ゲームログのコピー表示とタブ別フィルターを追加。チャット窓の画面外移動に対応し、ログ受信中のスクロール操作と設定画面の表記を改善。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"

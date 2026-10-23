@@ -29,7 +29,7 @@ public sealed partial class Plugin
             var background = (int)settings.BackgroundMode;
             if (AppearanceDropdown("chat-background", "背景の描画方式", ref background, BackgroundModes))
             { settings.BackgroundMode = (ChatBackgroundMode)background; changed = true; }
-            ImGui.TextWrapped("通常はカスタムの基準となる背景色を重ねます。乗算（黒）は背景アルファに応じて背後を暗くします。切り替えても編集値は保持されます。");
+            ImGui.TextWrapped("通常は基準の背景色を重ね、乗算（黒）は背後を暗くします。切り替えても編集値は保持します。");
             var blur = settings.BackgroundBlur;
             if (UiCheckbox("背景の縁をぼかす", ref blur)) { settings.BackgroundBlur = blur; changed = true; }
             if (blur)
@@ -53,7 +53,7 @@ public sealed partial class Plugin
                 if (AppearanceInteger("角丸 (px)", ref rounding, 0, 24)) { settings.WindowRounding = rounding; changed = true; }
                 if (UiButton("余白・外枠を初期値に戻す")) { ResetWindowLayoutDefaults(); changed = true; }
             } finally { ImGui.EndDisabled(); }
-            ImGui.TextWrapped("既定は従来の余白・外枠です。カスタマイズ時は外枠の太さを0にすると枠を隠せます。");
+            ImGui.TextWrapped("外枠の太さを0にすると枠を隠せます。");
         }
         finally { ImGui.EndDisabled(); }
         return changed;
@@ -74,7 +74,7 @@ public sealed partial class Plugin
             changed |= DrawScrollbarPlacementSettings();
         }
         ImGui.TextWrapped("自動表示でもバーの幅を確保し、行頭位置を揃えます。非表示でもマウスホイールでスクロールできます。");
-        ImGui.TextWrapped("横位置はウィンドウ左端が0です。上端・下端は0で縦余白に追従する標準の長さになります。＋で外側へ伸ばし、−で内側へ短くします。−／＋ボタンは1pxずつ調整します。ウィンドウ外には出ず、ON/OFFでは編集値を保持します。");
+        ImGui.TextWrapped("横位置は窓の左端が0です。上端・下端は0で標準、＋で伸ばし、−で短くします（1px刻み）。窓の外には出ません。非表示にしても編集値は保持します。");
 
         return changed;
     }
@@ -184,7 +184,7 @@ public sealed partial class Plugin
             if (windowModels.TryGetValue(primary?.Id ?? "main", out var host)) { host.Collapsed = false; host.CollapsedCondition = ImGuiCond.Always; host.RequestFocus = true; }
             changed = true;
         }
-        ImGui.TextWrapped("通常はタイトル・タブをドラッグして移動します。Alt移動ONなら、タイトル・タブがなくてもAlt＋ログ欄のドラッグで移動できます。クリック透過中も使えます。");
+        ImGui.TextWrapped("タイトル・タブをドラッグして移動します。Alt移動ONなら、Alt＋ログ欄のドラッグでも移動できます（クリック透過中も可）。");
         UiSection("スナップ");
         var snap = settings.SnapWindows;
         if (UiCheckbox("画面端・他のチャット窓へスナップ", ref snap)) { settings.SnapWindows = snap; changed = true; }

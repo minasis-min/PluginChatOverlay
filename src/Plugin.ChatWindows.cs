@@ -34,12 +34,18 @@ public sealed partial class Plugin
     {
         var state = View(tab.Id);
         var sameRules = state.FilterAll == tab.IncludeAll && state.FilterUnknown == tab.IncludeUnknown
-            && state.FilterPlugins.SequenceEqual(tab.Plugins);
+            && state.FilterPlugins.SequenceEqual(tab.Plugins)
+            && state.FilterGameEnabled == tab.GameLogs.Enabled && tab.GameLogs.Rows.SetEquals(state.FilterGameRows);
         if (!ReferenceEquals(state.FilterSource, docs) || !sameRules)
         {
             state.FilterSource = docs; state.FilterAll = tab.IncludeAll; state.FilterUnknown = tab.IncludeUnknown;
-            if (!sameRules) state.FilterPlugins = tab.Plugins.ToArray();
-            state.FilteredDocuments = tab.IncludeAll ? docs : docs.Where(d => tab.Matches(d.Plugin)).ToArray();
+            if (!sameRules)
+            {
+                state.FilterPlugins = tab.Plugins.ToArray();
+                state.FilterGameEnabled = tab.GameLogs.Enabled; state.FilterGameRows = tab.GameLogs.Rows.ToArray();
+            }
+            state.FilteredDocuments = docs.Where(d => d.Record.Origin == ChatRecordOrigin.Game
+                ? gameLogCatalog.Matches(tab.GameLogs, d.Record.Kind, d.Record.Source, d.Record.Target) : tab.Matches(d.Plugin)).ToArray();
         }
         return state.FilteredDocuments;
     }

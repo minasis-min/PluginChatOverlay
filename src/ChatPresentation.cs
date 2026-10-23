@@ -40,7 +40,7 @@ internal sealed class DisplayDocument(ChatRecord record, string plugin, Settings
     public ChatRecord Record { get; } = record;
     public string Plugin { get; } = plugin;
     public int Revision { get; } = revision;
-    public byte[] Bytes { get; } = Content(record, settings, palette.Prefix(record.Kind));
+    public byte[] Bytes { get; } = Content(record, settings, record.Origin == ChatRecordOrigin.Game ? [] : palette.Prefix(record.Kind));
     public string Text { get; private set; } = "";
     public void CacheText() => Text = SeString.Parse(Bytes).TextValue;
     internal static byte[] Content(ChatRecord record, Settings settings, byte[] bodyColor)

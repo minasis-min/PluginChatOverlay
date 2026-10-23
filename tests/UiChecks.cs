@@ -459,6 +459,7 @@ internal static class UiChecks
             var duplicate = new OverlayThemeScope(ui); duplicate.Dispose(); duplicate.Dispose();
             Check(ImGui.GetStyle().WindowPadding == before, "Minasis overlay theme tolerates repeated disposal");
             ImGui.EndFrame();
+            GameLogUiChecks.Run();
             ui.Dispose();
             Check(other.Theme == UiTheme.Cream, "disposing embedded UI preserves other instance state");
         }

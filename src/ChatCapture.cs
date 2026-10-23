@@ -78,7 +78,7 @@ internal sealed class ChatCapture : IDisposable
         var original = message.OriginalMessage.AsSpan().Data.ToArray();
         var modified = message.Message.Encode();
         if (!LootAppend.Split((int)message.LogKind, original, modified, out var addition)) return;
-        var sender = message.Sender.Encode().ToArray();
+        var sender = message.Sender.Encode();
         var restored = SeString.Parse(original);
         var plain = SeString.Parse(addition).TextValue;
         if (!history.TryAdd(id => new(id, (int)message.LogKind, (int)message.SourceKind, (int)message.TargetKind, message.Timestamp,
@@ -92,10 +92,12 @@ internal sealed class ChatCapture : IDisposable
         catch { history.Remove(recordId); throw; }
     }
 
+    internal ChatCallOrigin ClassifyCurrentCall() => Compatible ? origin!.ClassifyCurrentCall() : ChatCallOrigin.Unknown;
+
     private static ChatRecord Copy(long id, IChatMessage message)
     {
-        var sender = message.Sender.Encode().ToArray();
-        var body = message.Message.Encode().ToArray();
+        var sender = message.Sender.Encode();
+        var body = message.Message.Encode();
         return new(id, (int)message.LogKind, (int)message.SourceKind, (int)message.TargetKind, message.Timestamp,
             sender, body, message.Sender.TextValue + (sender.Length > 0 ? ": " : "") + message.Message.TextValue);
     }

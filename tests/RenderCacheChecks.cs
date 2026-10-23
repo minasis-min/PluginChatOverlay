@@ -47,12 +47,19 @@ internal static class RenderCacheChecks
         Set(state, "UnreadDocuments", docs);
         Set(plugin, "renderedSnapshot", snapshot); Set(plugin, "renderedDocuments", docs); Set(plugin, "frameDocuments", docs);
         var prune = typeof(Plugin).GetMethod("PruneHistoryCaches", Fields)!;
+        Set(state, "ScrollbarDragging", true); Set(state, "ScrollbarHovered", true);
+        Set(state, "ScrollMaximum", 200f); Set(state, "RequestedScroll", (float?)75f);
         history.TryAdd(id => new(id, 0, 0, 0, 0, [], [(byte)'b'], "b"), out _);
         prune.Invoke(plugin, null);
         Check(!cachedDocs.ContainsKey(snapshot[0].Id) && !rows.Contains(snapshot[0].Id) && rows.Count == 19
             && ((Array)Get(state, "Documents")!).Length == 0 && Get(state, "FilterSource") == null,
             "automatic eviction releases hidden view documents and rows without drawing that tab");
+        Check((bool)Get(state, "ScrollbarDragging")! && (float)Get(state, "ScrollMaximum")! == 200f
+            && (float?)Get(state, "RequestedScroll") == 75f,
+            "ordinary eviction preserves scrollbar dragging, bounds and pending input");
         history.ApplyLimit(10); prune.Invoke(plugin, null);
+        Check((bool)Get(state, "ScrollbarDragging")! && (float?)Get(state, "RequestedScroll") == 75f,
+            "history shrink preserves pending scrollbar input for the next draw");
         Check(rows.Count == 9 && cachedDocs.Count == 9 && !rows.Contains(snapshot[1].Id),
             "history limit reduction purges evicted hidden-view rows immediately");
         var pendingCopy = new CopyInput(); pendingCopy.Suppress(true, true, true, state);
@@ -71,6 +78,9 @@ internal static class RenderCacheChecks
             && ((Array)Get(plugin, "renderedDocuments")!).Length == 0 && ((Array)Get(plugin, "frameDocuments")!).Length == 0
             && ((Array)Get(state, "FilteredDocuments")!).Length == 0 && Get(state, "UnreadDocuments") == null,
             "history clear releases shared and hidden-view caches without drawing any windows");
+        Check(!(bool)Get(state, "ScrollbarDragging")! && !(bool)Get(state, "ScrollbarHovered")!
+            && (float)Get(state, "ScrollMaximum")! == 0 && Get(state, "RequestedScroll") == null,
+            "clearing all history resets scrollbar interaction and pending scroll");
         var preferences = new Settings { AppearanceMode = ChatAppearanceMode.Custom }; Set(plugin, "settings", preferences);
         var retainedRow = Activator.CreateInstance(rowType, [docs[0]])!; rows.Add(docs[0].Record.Id, retainedRow);
         var updateRender = typeof(Plugin).GetMethod("UpdateRenderSettings", Fields)!;

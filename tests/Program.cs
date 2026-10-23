@@ -6,6 +6,11 @@ using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 
 
+if(args.Length==1 && args[0]=="--chat-fingerprint") { var t=typeof(IChatGui).Assembly.GetType("Dalamud.Game.Gui.ChatGui")!; foreach(var name in new[]{"UpdateQueue","HandlePrintMessageDetour"}) Console.WriteLine(name+" "+MethodCompatibility.Fingerprint(t.GetMethod(name,BindingFlags.Instance|BindingFlags.NonPublic)!)); return; }
+if(args.Length==1 && args[0]=="--tooltip-contract") { Console.WriteLine(NativeTooltipCompatibility.Fingerprint()); return; }
+if(args.Length==1 && args[0]=="--tooltip-parts") { var parts=new Dictionary<string,string>(); NativeTooltipCompatibility.Fingerprint(observe:(k,v)=>parts[k]=v); Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(parts)); return; }
+if(args.Length==2 && args[0]=="--native-log-data") { GameLogChecks.RunGameData(args[1]); return; }
+GameLogChecks.Run();
 var flags=BindingFlags.Static|BindingFlags.NonPublic;
 var detour=typeof(Probe).GetMethod("Detour",flags)!;
 var update=typeof(Probe).GetMethod("UpdateQueue",flags)!;
@@ -30,13 +35,13 @@ var cacheHistory = new History();
 cacheHistory.TryAdd(id => Record(id), out var cacheId);
 var cached = cacheHistory.RenderSnapshot();
 Check(ReferenceEquals(cached, cacheHistory.RenderSnapshot()), "unchanged rendering reuses history snapshot");
-cacheHistory.Replace(cacheId, Record(cacheId, 2));
-var replacedCache = cacheHistory.RenderSnapshot();
-Check(!ReferenceEquals(cached, replacedCache) && cached[0].Bytes == 1 && replacedCache[0].Bytes == 2, "replacement invalidates cache without changing previously published snapshot");
+cacheHistory.TryAdd(id => Record(id, 2), out var addedId);
+var addedCache = cacheHistory.RenderSnapshot();
+Check(!ReferenceEquals(cached, addedCache) && cached.Length == 1 && addedCache.Length == 2 && addedCache[1].Bytes == 2, "new capture invalidates cache without changing previously published snapshot");
 cacheHistory.TryAdd(id => Record(id, History.MaxRecordBytes + 1), out _);
-Check(ReferenceEquals(replacedCache, cacheHistory.RenderSnapshot()), "rejected capture preserves cached snapshot");
-cacheHistory.Remove(cacheId);
-Check(cacheHistory.RenderSnapshot().Length == 0 && replacedCache.Length == 1, "rollback invalidates cache without modifying old snapshot");
+Check(ReferenceEquals(addedCache, cacheHistory.RenderSnapshot()), "rejected capture preserves cached snapshot");
+cacheHistory.Remove(cacheId); cacheHistory.Remove(addedId);
+Check(cacheHistory.RenderSnapshot().Length == 0 && addedCache.Length == 2, "rollback invalidates cache without modifying old snapshot");
 for (var i = 0; i < 100; i++) cacheHistory.TryAdd(id => Record(id), out _);
 var beforeTrim = cacheHistory.RenderSnapshot(); cacheHistory.ApplyLimit(10);
 Check(cacheHistory.RenderSnapshot().Length == 10 && beforeTrim.Length == 100, "batch trimming invalidates cache and retains snapshot ownership");
@@ -62,8 +67,8 @@ history.Clear();
 for(var i=0;i<400;i++) CheckQuiet(history.TryAdd(id=>Record(id,History.MaxRecordBytes),out _));
 Check(history.Snapshot().Sum(r=>r.Bytes)<=History.MaxHistoryBytes,"byte capacity bounds bulk logs");
 var item=history.Snapshot()[0];
-history.Replace(item.Id,Record(item.Id,4));
-Check(history.Snapshot().Length==256 && history.Snapshot()[0].Body.Length==4,"final-event replacement does not duplicate");
+
+Check(history.Snapshot().Length==256,"byte cap retains exactly 256 maximum-sized records");
 history.Remove(item.Id);
 Check(history.Snapshot().Length==255,"unhandled rollback removes overlay duplicate");
 history.ApplyLimit(10);

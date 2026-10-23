@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup><AssemblyName>PluginChatOverlay</AssemblyName><DistributionBuild Condition="'$(DistributionBuild)' == ''">true</DistributionBuild><Version>1.0.8.0</Version><Authors>min</Authors><Copyright>Copyright (c) 2026, Minasis; original author attribution: min</Copyright><PackageLicenseExpression>MIT</PackageLicenseExpression><AllowUnsafeBlocks>true</AllowUnsafeBlocks><DalamudLibPath>$(MSBuildThisFileDirectory)../.dependencies/Dalamud-15.0.3.6</DalamudLibPath></PropertyGroup>
+  <PropertyGroup><AssemblyName>PluginChatOverlay</AssemblyName><DistributionBuild Condition="'$(DistributionBuild)' == ''">true</DistributionBuild><Version>1.0.9.0</Version><Authors>min</Authors><Copyright>Copyright (c) 2026, Minasis; original author attribution: min</Copyright><PackageLicenseExpression>MIT</PackageLicenseExpression><AllowUnsafeBlocks>true</AllowUnsafeBlocks><DalamudLibPath>$(MSBuildThisFileDirectory)../.dependencies/Dalamud-15.0.3.6</DalamudLibPath></PropertyGroup>
   <PropertyGroup Condition="'$(DistributionBuild)' == 'true'"><DefineConstants>$(DefineConstants);DISTRIBUTION</DefineConstants><DebugType>none</DebugType><DebugSymbols>false</DebugSymbols></PropertyGroup>
   <ItemGroup>
     <Compile Include="../vendor/MinasisUI/0.1.14/*.cs" Link="MinasisUI/%(Filename)%(Extension)" />

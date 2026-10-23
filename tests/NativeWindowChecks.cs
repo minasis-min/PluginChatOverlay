@@ -71,6 +71,17 @@ internal static class NativeWindowChecks
         const BindingFlags flags = BindingFlags.Instance | BindingFlags.NonPublic;
         var plugin = (Plugin)RuntimeHelpers.GetUninitializedObject(typeof(Plugin));
         typeof(Plugin).GetField("settings", flags)!.SetValue(plugin, settings);
+        typeof(Plugin).GetField("gameLogCatalog", flags)!.SetValue(plugin, new GameLogCatalog([]));
+        var chatWindowType = typeof(Plugin).GetNestedType("ChatWindow", BindingFlags.NonPublic)!;
+        foreach (var detached in new[] { false, true })
+        {
+            var tab = detached ? new ChatTab { Id = "external-chat", Detached = true } : null;
+            var window = (Dalamud.Interface.Windowing.Window)Activator.CreateInstance(chatWindowType,
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance,
+                null, [plugin, tab?.Id ?? "main", tab], null)!;
+            Check(!window.ForceMainWindow,
+                $"{(detached ? "detached" : "main")} chat window follows Dalamud multi-monitor policy without a game-window lock");
+        }
         var directory = Path.Combine(AppContext.BaseDirectory, "native-window-checks", Guid.NewGuid().ToString("N"));
         typeof(Plugin).GetField("store", flags)!.SetValue(plugin, SettingsStore.ForDistribution(directory, AppContext.BaseDirectory));
         settings.MainWindowVisible = false;

@@ -30,7 +30,8 @@ public sealed partial class Plugin
         public DisplayDocument[]? FilterSource, UnreadDocuments;
         public DisplayDocument[] FilteredDocuments = [];
         public string[] FilterPlugins = [];
-        public bool FilterAll, FilterUnknown;
+        public bool FilterAll, FilterUnknown, FilterGameEnabled;
+        public uint[] FilterGameRows = [];
         public long UnreadReadUpTo;
         public WindowRect? Window;
         public ChatWindow? Host;

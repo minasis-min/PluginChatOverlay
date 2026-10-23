@@ -52,7 +52,7 @@ public sealed partial class Plugin
         public ChatTab? Tab { get; }
         public bool RequestedOpen;
         public ChatWindow(Plugin owner, string id, ChatTab? tab)
-            : base(tab == null ? WindowTitle.MainTitle(owner.settings.ShowWindowTitle) : WindowTitle.Detached(tab.Name, tab.Id, 0), ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings, true)
+            : base(tab == null ? WindowTitle.MainTitle(owner.settings.ShowWindowTitle) : WindowTitle.Detached(tab.Name, tab.Id, 0), ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoSavedSettings, forceMainWindow: false)
         {
             this.owner = owner; this.id = id; Tab = tab;
             AllowPinning = true; AllowClickthrough = true; AllowBackgroundBlur = true;

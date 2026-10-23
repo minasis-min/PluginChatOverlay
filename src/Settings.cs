@@ -23,6 +23,7 @@ internal sealed class Settings
     [JsonIgnore] public int EffectiveScrollbarDisplay => IsCustomAppearance ? ScrollbarDisplay : 1;
     [JsonIgnore] public bool DarkenBackground => IsCustomAppearance && BackgroundMode == ChatBackgroundMode.Darken;
     public bool Enabled { get; set; } // Initial opt-in for this unverified development build.
+    public bool CopyGameLogs { get; set; }
     public bool Visible { get; set; } = true;
     public bool MainWindowVisible { get; set; } = true;
     public float ConfigWidth { get; set; } = DefaultConfigWidth;
@@ -49,6 +50,7 @@ internal sealed class Settings
     public bool PadTimestampHour { get; set; } = true;
     public uint TimestampColor { get; set; } = 0xFFFFFFFF;
     public int HistoryLimit { get; set; } = History.DefaultRecords;
+    public int GameHistoryLimit { get; set; } = History.DefaultRecords;
     public bool CopyOnDragRelease { get; set; }
     public bool CopyWithCtrlC { get; set; } = true;
     public bool ShowWindowTitle { get; set; } = true;
@@ -194,6 +196,7 @@ internal sealed class Settings
         NativeButtonFontSize = float.IsFinite(NativeButtonFontSize) ? Math.Clamp(MathF.Round(NativeButtonFontSize), 8, 32) : 18;
         NativeButtonOffsetX = Math.Clamp(NativeButtonOffsetX, -2000, 2000);
         NativeButtonOffsetY = Math.Clamp(NativeButtonOffsetY, -2000, 2000);
+        GameHistoryLimit = Math.Clamp(GameHistoryLimit, 10, History.MaxRecords);
         Tabs ??= [];
         Tabs = Tabs.Where(t => t != null).Take(8).ToList();
         if (Tabs.Count == 0) Tabs.Add(new() { Id = "all", Name = "タブ1", IncludeAll = true, Detached = true });
@@ -204,6 +207,7 @@ internal sealed class Settings
             if (string.IsNullOrWhiteSpace(tab.Id) || !ids.Add(tab.Id)) { tab.Id = Guid.NewGuid().ToString("N"); ids.Add(tab.Id); }
             tab.Name = string.IsNullOrWhiteSpace(tab.Name) ? "チャット" : tab.Name[..Math.Min(48, tab.Name.Length)];
             tab.Plugins ??= []; tab.Plugins = tab.Plugins.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct().Take(256).ToList();
+            tab.GameLogs ??= new(); tab.GameLogs.Normalize();
             tab.ParentWindowId ??= "";
             tab.X = float.IsFinite(tab.X) ? tab.X : 160; tab.Y = float.IsFinite(tab.Y) ? tab.Y : 160;
             tab.Width = float.IsFinite(tab.Width) ? Math.Clamp(tab.Width, 250, 4000) : 600;
@@ -275,6 +279,7 @@ internal sealed class ChatTab
     public bool IncludeAll { get; set; }
     public bool IncludeUnknown { get; set; }
     public List<string> Plugins { get; set; } = [];
+    public GameLogFilter GameLogs { get; set; } = new();
     public bool Detached { get; set; }
     public string ParentWindowId { get; set; } = "";
     public bool Visible { get; set; } = true;
