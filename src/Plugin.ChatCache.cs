@@ -53,7 +53,7 @@ public sealed partial class Plugin
     private DisplayDocument Document(ChatRecord record)
     {
         if (documents.TryGetValue(record.Id, out var cached) && ReferenceEquals(cached.Record, record) && cached.Revision == presentationRevision) return cached;
-        var plugin = record.Origin == ChatRecordOrigin.Game ? "" : tags.Resolve(SeString.Parse(record.Body).TextValue);
+        var plugin = record.Origin == ChatRecordOrigin.Game ? "" : record.PluginOwner.Length > 0 ? record.PluginOwner : tags.Resolve(SeString.Parse(record.Body).TextValue);
         if (plugin.Length > 0) recognised.Add(plugin);
         var doc = new DisplayDocument(record, plugin, settings, palette, presentationRevision);
         doc.CacheText(); documents[record.Id] = doc; return doc;

@@ -460,6 +460,9 @@ internal static class UiChecks
             Check(ImGui.GetStyle().WindowPadding == before, "Minasis overlay theme tolerates repeated disposal");
             ImGui.EndFrame();
             GameLogUiChecks.Run();
+            WorkspaceChecks.Run();
+            TabOrderChecks.Run();
+            HoverTextChecks.Run();
             ui.Dispose();
             Check(other.Theme == UiTheme.Cream, "disposing embedded UI preserves other instance state");
         }

@@ -15,6 +15,13 @@ public sealed partial class Plugin
             case "off": settings.Enabled = false; Save(); break;
             case "reset": ClearHistory(); break;
             case "test": TestMessages(); break;
+            case "toasttest": TestPluginToast(); break;
+            case "toasttest pair": TestPluginToast(true); break;
+            case "toast on": settings.SeparatePluginToasts = true; StopPluginToasts(); Save(); break;
+            case "toast off": settings.SeparatePluginToasts = false; StopPluginToasts(); Save(); break;
+            case "toast status": log.Information("PCO toast: enabled={Enabled}, ready={Ready}, captured={Captured}, passed={Passed}, failures={Failures}, status={Status}",
+                settings.SeparatePluginToasts, ToastAllowed && toastReadyAt != 0 && Environment.TickCount64 - toastReadyAt < 250,
+                toastCapture?.Captured ?? 0, toastCapture?.Passed ?? 0, toastCapture?.Failures ?? 0, toastCapture?.Diagnostic ?? "未初期化"); break;
             case "unlink": chat.RemoveChatLinkHandler(701); testLinkActive = false; break;
             case "burst": for (var i = 0; i < 2000; i++) chat.Print($"[PCO 負荷試験] {i} 日本語 折り返し表示の確認"); break;
             default: OpenMain(); break;

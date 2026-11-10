@@ -35,15 +35,22 @@ internal sealed class ChatPalette(IDataManager data, IPluginLog log)
 
 }
 
-internal sealed class DisplayDocument(ChatRecord record, string plugin, Settings settings, ChatPalette palette, int revision)
+internal sealed class DisplayDocument(ChatRecord record, string plugin, Settings settings, ChatPalette palette, int revision, bool includeRouteMap = false)
 {
     public ChatRecord Record { get; } = record;
     public string Plugin { get; } = plugin;
     public int Revision { get; } = revision;
-    public byte[] Bytes { get; } = Content(record, settings, record.Origin == ChatRecordOrigin.Game ? [] : palette.Prefix(record.Kind));
+    public byte[] Bytes { get; } = Content(record, settings, record.Origin == ChatRecordOrigin.Game ? [] : palette.Prefix(record.Kind), includeRouteMap);
     public string Text { get; private set; } = "";
     public void CacheText() => Text = SeString.Parse(Bytes).TextValue;
-    internal static byte[] Content(ChatRecord record, Settings settings, byte[] bodyColor)
+    private DisplayDocument? routeWithMap;
+    public DisplayDocument WithRouteMap(Settings settings,ChatPalette palette)
+    {
+        if(Record.MapContext.Length==0) return this;
+        if(routeWithMap==null) { routeWithMap=new(Record,Plugin,settings,palette,Revision,true); routeWithMap.CacheText(); }
+        return routeWithMap;
+    }
+    internal static byte[] Content(ChatRecord record, Settings settings, byte[] bodyColor, bool includeRouteMap = false)
     {
         var builder = new SeStringBuilder();
         if (settings.ShowTime)
@@ -55,6 +62,7 @@ internal sealed class DisplayDocument(ChatRecord record, string plugin, Settings
         }
         builder.Append(SeString.Parse(bodyColor));
         if (record.Sender.Length > 0) builder.Append(SeString.Parse(record.Sender)).AddText(": ");
+        if(includeRouteMap && record.MapContext.Length>0) builder.Append(SeString.Parse(record.MapContext)).AddText(" ");
         builder.Append(SeString.Parse(record.Body));
         return builder.Build().Encode();
     }

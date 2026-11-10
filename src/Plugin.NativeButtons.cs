@@ -76,16 +76,13 @@ public sealed partial class Plugin
         }
         finally { ImGui.PopStyleVar(); }
     }
-    private static bool DrawNativeIcon(string id, FontAwesomeIcon icon, string description, NativeButtonLayout layout)
+    private bool DrawNativeIcon(string id, FontAwesomeIcon icon, string description, NativeButtonLayout layout)
     {
         var clicked = DrawNativeShortcut(id, icon.ToIconString(), layout, UiBuilder.IconFont);
         if (ImGui.IsItemHovered())
         {
             var bounds = ImGui.GetItemRectMin();
-            ImGui.SetNextWindowPos(new(bounds.X + layout.Height / 2, bounds.Y - 4), ImGuiCond.Always, new(.5f, 1));
-            ImGui.BeginTooltip();
-            try { ImGui.TextUnformatted(description); }
-            finally { ImGui.EndTooltip(); }
+            UiTooltip(description,new(bounds.X + layout.Height / 2,bounds.Y - 4));
         }
         return clicked;
     }
@@ -134,11 +131,12 @@ public sealed partial class Plugin
     {
         if (settings.ToggleWindowVisibility(id)) Save();
     }
-    private bool DrawNativeButtonSettings()
+    private bool DrawNativeButtonSettings() => SettingsCard("DrawNativeButtonSettings", DrawNativeButtonSettingsBody);
+    private bool DrawNativeButtonSettingsBody()
     {
         UiSection("ショートカット");
-        ImGui.TextWrapped("吹き出し：チャット表示/非表示。複数ウィンドウがある場合は、切り替えるウィンドウを選びます。");
-        ImGui.TextWrapped("歯車：設定。クリックすると設定画面を開く・閉じることができます。");
+        UiDescription("吹き出し：チャット表示/非表示。複数ウィンドウがある場合は、切り替えるウィンドウを選びます。");
+        UiDescription("歯車：設定。クリックすると設定画面を開く・閉じることができます。");
         var changed = false;
         var show = settings.ShowNativeButtons;
         if (UiCheckbox("ボタンを表示", ref show)) { settings.ShowNativeButtons = show; changed = true; }
@@ -156,7 +154,7 @@ public sealed partial class Plugin
             settings.NativeButtonOffsetX = settings.NativeButtonOffsetY = 0;
             changed = true;
         }
-        ImGui.TextWrapped("横は＋で右、−で左。縦は＋で下、−で上へ移動します。1px刻みで調整でき、UI倍率に関係なく指定したpx分だけ移動します。");
+        UiDescription("横は＋で右、−で左。縦は＋で下、−で上へ移動します。1px刻みで調整でき、UI倍率に関係なく指定したpx分だけ移動します。");
         return changed;
     }
     private bool NativeOffsetInput(string id, string label, ref int value)

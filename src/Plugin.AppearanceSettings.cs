@@ -5,7 +5,8 @@ namespace PluginChatOverlay;
 
 public sealed partial class Plugin
 {
-    private bool DrawWindowDisplaySettings()
+    private bool DrawWindowDisplaySettings() => SettingsCard("DrawWindowDisplaySettings", DrawWindowDisplaySettingsBody);
+    private bool DrawWindowDisplaySettingsBody()
     {
         var changed = false;
         UiSection("ウィンドウの表示");
@@ -13,10 +14,11 @@ public sealed partial class Plugin
         if (UiCheckbox("チャットのタイトルバーを表示", ref title)) { settings.ShowWindowTitle = title; changed = true; }
         var tabs = settings.ShowTabs;
         if (UiCheckbox("チャットのタブバーを表示", ref tabs)) { SetTabBarVisible(tabs); changed = true; }
-        ImGui.TextWrapped("両方OFFならログだけ表示します。タブの切替・再表示はログ欄の右クリックから行えます。");
+        UiDescription("両方OFFならログだけ表示します。タブの切替・再表示はログ欄の右クリックから行えます。");
         return changed;
     }
-    private bool DrawDetailedWindowAppearance()
+    private bool DrawDetailedWindowAppearance() => SettingsCard("DrawDetailedWindowAppearance", DrawDetailedWindowAppearanceBody);
+    private bool DrawDetailedWindowAppearanceBody()
     {
         var changed = EnsureWindowLayoutDefaults();
         UiSection("背景の縁・内側余白・外枠");
@@ -29,7 +31,7 @@ public sealed partial class Plugin
             var background = (int)settings.BackgroundMode;
             if (AppearanceDropdown("chat-background", "背景の描画方式", ref background, BackgroundModes))
             { settings.BackgroundMode = (ChatBackgroundMode)background; changed = true; }
-            ImGui.TextWrapped("通常は基準の背景色を重ね、乗算（黒）は背後を暗くします。切り替えても編集値は保持します。");
+            UiDescription("通常は基準の背景色を重ね、乗算（黒）は背後を暗くします。切り替えても編集値は保持します。");
             var blur = settings.BackgroundBlur;
             if (UiCheckbox("背景の縁をぼかす", ref blur)) { settings.BackgroundBlur = blur; changed = true; }
             if (blur)
@@ -53,12 +55,13 @@ public sealed partial class Plugin
                 if (AppearanceInteger("角丸 (px)", ref rounding, 0, 24)) { settings.WindowRounding = rounding; changed = true; }
                 if (UiButton("余白・外枠を初期値に戻す")) { ResetWindowLayoutDefaults(); changed = true; }
             } finally { ImGui.EndDisabled(); }
-            ImGui.TextWrapped("外枠の太さを0にすると枠を隠せます。");
+            UiDescription("外枠の太さを0にすると枠を隠せます。");
         }
         finally { ImGui.EndDisabled(); }
         return changed;
     }
-    private bool DrawScrollbarAppearance()
+    private bool DrawScrollbarAppearance() => SettingsCard("DrawScrollbarAppearance", DrawScrollbarAppearanceBody);
+    private bool DrawScrollbarAppearanceBody()
     {
         var changed = false;
         UiSection("スクロールバー");
@@ -73,8 +76,8 @@ public sealed partial class Plugin
             changed |= DrawScrollbarColorSettings();
             changed |= DrawScrollbarPlacementSettings();
         }
-        ImGui.TextWrapped("自動表示でもバーの幅を確保し、行頭位置を揃えます。非表示でもマウスホイールでスクロールできます。");
-        ImGui.TextWrapped("横位置は窓の左端が0です。上端・下端は0で標準、＋で伸ばし、−で短くします（1px刻み）。窓の外には出ません。非表示にしても編集値は保持します。");
+        UiDescription("自動表示でもバーの幅を確保し、行頭位置を揃えます。非表示でもマウスホイールでスクロールできます。");
+        UiDescription("横位置は窓の左端が0です。上端・下端は0で標準、＋で伸ばし、−で短くします（1px刻み）。窓の外には出ません。非表示にしても編集値は保持します。");
 
         return changed;
     }
@@ -149,11 +152,11 @@ public sealed partial class Plugin
     }
     private bool DrawGlobalWindowSettings()
     {
-        var changed = DrawWindowMovementSettings();
-        if (UiButton("全ウィンドウの位置・サイズをリセット")) { ResetWindowGeometry(); changed = true; }
+        var changed = DrawWindowMovementSettings() | SettingsCard("snap", DrawSnapSettings);
         return changed;
     }
-    private bool DrawWindowMovementSettings()
+    private bool DrawWindowMovementSettings() => SettingsCard("DrawWindowMovementSettings", DrawWindowMovementSettingsBody);
+    private bool DrawWindowMovementSettingsBody()
     {
         UiSection("ウィンドウ操作");
         var changed = false;
@@ -168,7 +171,7 @@ public sealed partial class Plugin
         finally { ImGui.EndDisabled(); }
         var resize = settings.AllowResize;
         if (UiCheckbox("チャットのサイズ変更を許可", ref resize)) { settings.AllowResize = resize; changed = true; }
-        ImGui.TextWrapped("メイン窓と独立窓に適用します。固定中・移動許可OFFではAlt移動も無効です。");
+        UiDescription("メイン窓と独立窓に適用します。固定中・移動許可OFFではAlt移動も無効です。");
         var primary = PrimaryWindowTab;
         var pinned = primary?.Pinned ?? settings.Pinned;
         if (UiCheckbox("最初の窓を固定（移動・サイズ変更を無効）", ref pinned))
@@ -184,7 +187,13 @@ public sealed partial class Plugin
             if (windowModels.TryGetValue(primary?.Id ?? "main", out var host)) { host.Collapsed = false; host.CollapsedCondition = ImGuiCond.Always; host.RequestFocus = true; }
             changed = true;
         }
-        ImGui.TextWrapped("タイトル・タブをドラッグして移動します。Alt移動ONなら、Alt＋ログ欄のドラッグでも移動できます（クリック透過中も可）。");
+        UiDescription("タイトル・タブをドラッグして移動します。Alt移動ONなら、Alt＋ログ欄のドラッグでも移動できます（クリック透過中も可）。");
+        if (UiButton("全ウィンドウの位置・サイズをリセット")) { ResetWindowGeometry(); changed = true; }
+        return changed;
+    }
+    private bool DrawSnapSettings()
+    {
+        var changed = false;
         UiSection("スナップ");
         var snap = settings.SnapWindows;
         if (UiCheckbox("画面端・他のチャット窓へスナップ", ref snap)) { settings.SnapWindows = snap; changed = true; }
@@ -192,14 +201,15 @@ public sealed partial class Plugin
         if (UiSlider("スナップ距離 (px)", ref distance, 4, 40)) { settings.SnapDistance = distance; changed = true; }
         return changed;
     }
-    private bool DrawTextDecorationSettings()
+    private bool DrawTextDecorationSettings() => SettingsCard("DrawTextDecorationSettings", DrawTextDecorationSettingsBody);
+    private bool DrawTextDecorationSettingsBody()
     {
         UiSection("文字間・縁取り");
         var changed = false;
         var spacing = settings.LetterSpacing;
         if (AppearanceInteger("横方向の文字間 (px)", ref spacing, -2, 12))
         { settings.LetterSpacing = spacing; RebuildChatFont(); changed = true; }
-        ImGui.TextWrapped("文字間はPCO専用のフォントに適用します。マイナス値では文字が重なる場合があります。");
+        UiDescription("文字間はPCO専用のフォントに適用します。マイナス値では文字が重なる場合があります。");
         var edge = settings.TextOutline;
         if (UiCheckbox("文字に縁取りを付ける", ref edge)) { settings.TextOutline = edge; changed = true; }
         if (edge)

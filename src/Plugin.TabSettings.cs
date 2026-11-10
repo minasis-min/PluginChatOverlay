@@ -6,7 +6,44 @@ namespace PluginChatOverlay;
 public sealed partial class Plugin
 {
     private string PluginName(string id) => pluginNames.TryGetValue(id, out var name) ? name : id;
+    private static readonly string[] TabSettingsPages=["管理","プラグイン通知","ゲームログ","ウィンドウ"];
     private bool DrawTabSettings()
+    {
+        if(settings.Tabs.All(t=>t.Id!=selectedSettingsTab)) selectedSettingsTab=settings.Tabs[0].Id;
+        var changed=SettingsCard("tab-target",DrawTabTarget);
+        if(minasisFrame) return changed | DrawTabSettingsPage(workspace.Tab);
+        if(!ImGui.BeginTabBar("ChatTabSettingsPages")) return changed;
+        try
+        {
+            for(var i=0;i<TabSettingsPages.Length;i++)
+            {
+                var active=ImGui.BeginTabItem(TabSettingsPages[i],ImGuiTabItemFlags.NoTooltip);
+                var available=ImGui.GetItemRectMax().X-ImGui.GetItemRectMin().X-ImGui.GetStyle().FramePadding.X*2;
+                if(ImGui.CalcTextSize(TabSettingsPages[i]).X>available) UiTooltip(TabSettingsPages[i]);
+                if(!active) continue;
+                try { changed |= DrawTabSettingsPage(i); }
+                finally { ImGui.EndTabItem(); }
+            }
+        }
+        finally { ImGui.EndTabBar(); }
+        return changed;
+    }
+    private bool DrawTabTarget()
+    {
+        var choices=settings.Tabs.Select(t=>new MinasisUI.UiChoice(t.Id,t.Name)).ToArray();
+        var selectedIndex=settings.Tabs.FindIndex(t=>t.Id==selectedSettingsTab);
+        if(UiDropdown("edit-chat-tab","編集するタブ",ref selectedIndex,choices,280 * ImGuiHelpers.GlobalScale)) selectedSettingsTab=choices[selectedIndex].Id;
+        return false;
+    }
+    private bool DrawTabSettingsPage(int page) => page switch
+    {
+        0 => SettingsCard("tab-details",DrawTabBasics),
+        1 => SettingsCard("tab-plugins",()=>DrawPluginLogFilters(settings.Tabs.First(t=>t.Id==selectedSettingsTab))),
+        2 => SettingsCard("tab-game",()=>DrawGameLogFilters(settings.Tabs.First(t=>t.Id==selectedSettingsTab))),
+        3 => SettingsCard("tab-window",DrawSelectedWindowSettings) | SettingsCard("tab-order",DrawTabOrderSettings),
+        _ => false,
+    };
+    private bool DrawTabBasics()
     {
         UiSection("タブ");
         if (scrollChatTabSettings) { ImGui.SetScrollHereY(0); scrollChatTabSettings = false; }
@@ -22,27 +59,50 @@ public sealed partial class Plugin
             settings.Tabs.Add(tab); selectedSettingsTab = tab.Id; changed = true;
         }
         if (settings.Tabs.All(t => t.Id != selectedSettingsTab)) selectedSettingsTab = settings.Tabs[0].Id;
-        if (ImGui.BeginCombo("編集するタブ", settings.Tabs.First(t => t.Id == selectedSettingsTab).Name))
-        {
-            try { foreach (var tab in settings.Tabs) if (ImGui.Selectable(tab.Name + "###configtab-" + tab.Id, tab.Id == selectedSettingsTab)) selectedSettingsTab = tab.Id; }
-            finally { ImGui.EndCombo(); }
-        }
         var selected = settings.Tabs.First(t => t.Id == selectedSettingsTab);
         var name = selected.Name; if (UiInputText("タブ名", ref name, 48)) { selected.Name = string.IsNullOrWhiteSpace(name) ? "チャット" : name; changed = true; }
-        ImGui.TextWrapped("窓の分離・所属先・サイズは「個別ウィンドウ」で設定します。タブの右クリックからも分離できます。");
-        if (settings.Tabs.Count > 1 && UiButton("このタブを削除"))
+        UiDescription("窓の分離・所属先・サイズは「ウィンドウ」で設定します。タブの右クリックからも分離できます。");
+        if (settings.Tabs.Count > 1 && UiGuardedButton("このタブを削除"))
         {
             var children = settings.Tabs.Where(t => t.ParentWindowId == selected.Id).ToArray();
             settings.RemoveTab(selected);
             foreach (var child in children) View(child.Id).ResetGeometry = true;
             views.Remove(selected.Id); selectedSettingsTab = settings.Tabs[0].Id; changed = true;
         }
-        changed |= DrawSelectedWindowSettings();
-        changed |= DrawTabLogFilters(settings.Tabs.First(t => t.Id == selectedSettingsTab));
+        return changed;
+    }
+    private bool MoveSelectedTab(int direction)
+    {
+        if(!settings.MoveTab(selectedSettingsTab,direction)) return false;
+        var tab=settings.Tabs.First(t=>t.Id==selectedSettingsTab);
+        View(settings.WindowOf(tab)).ResetTabOrder=true;
+        return true;
+    }
+    private bool DrawTabOrderSettings()
+    {
+        UiSection("タブの順番");
+        var selected=settings.Tabs.First(t=>t.Id==selectedSettingsTab);
+        var tabs=settings.WindowTabs(settings.WindowOf(selected)).ToArray();
+        foreach(var tab in tabs)
+        {
+            var clicked=minasisFrame ? ui.Selectable("tab-order-"+tab.Id,tab.Name,tab.Id==selectedSettingsTab)
+                : ImGui.Selectable(tab.Name+"###tab-order-"+tab.Id,tab.Id==selectedSettingsTab);
+            if(clicked) selectedSettingsTab=tab.Id;
+        }
+        var index=Array.FindIndex(tabs,t=>t.Id==selectedSettingsTab);
+        var changed=false;
+        ImGui.BeginDisabled(index<=0);
+        try { if(UiButton("前へ")) changed |= MoveSelectedTab(-1); }
+        finally { ImGui.EndDisabled(); }
+        ImGui.SameLine();
+        ImGui.BeginDisabled(index<0 || index>=tabs.Length-1);
+        try { if(UiButton("後ろへ")) changed |= MoveSelectedTab(1); }
+        finally { ImGui.EndDisabled(); }
         return changed;
     }
     private bool DrawPluginLogFilters(ChatTab selected)
     {
+        UiSection("プラグイン通知");
         var changed = false;
         var all = selected.IncludeAll; if (UiCheckbox("すべてのプラグインを表示", ref all)) { selected.IncludeAll = all; changed = true; }
         if (!selected.IncludeAll)
@@ -56,7 +116,7 @@ public sealed partial class Plugin
                 if (child) foreach (var plugin in pluginNames.Keys.Concat(recognised).Distinct().OrderBy(PluginName))
                 {
                     var included = selected.Plugins.Contains(plugin);
-                    if (!UiCheckbox(PluginName(plugin) + "###include-" + plugin, ref included)) continue;
+                    if (!UiListCheckbox(PluginName(plugin) + "###include-" + plugin, ref included)) continue;
                     if (included) selected.Plugins.Add(plugin); else selected.Plugins.Remove(plugin); changed = true;
                 }
             }
@@ -79,19 +139,14 @@ public sealed partial class Plugin
         }
         if (!selected.Detached)
         {
-            var parent = settings.Tabs.FirstOrDefault(t => t.Detached && t.Id == selected.ParentWindowId);
-            if (ImGui.BeginCombo("所属ウィンドウ", parent?.Name ?? "メイン"))
+            var roots=settings.Tabs.Where(t=>t.Detached).ToArray();
+            var parents=new[] { new MinasisUI.UiChoice("main","メイン") }.Concat(roots.Select(t=>new MinasisUI.UiChoice(t.Id,t.Name))).ToArray();
+            var parentIndex=Array.FindIndex(parents,c=>c.Id==settings.WindowOf(selected));
+            if(UiDropdown("tab-parent-window","所属ウィンドウ",ref parentIndex,parents,280 * ImGuiHelpers.GlobalScale))
             {
-                try
-                {
-                    if (ImGui.Selectable("メイン", parent == null)) { settings.Attach(selected, "main"); changed = true; }
-                    foreach (var root in settings.Tabs.Where(t => t.Detached))
-                        if (ImGui.Selectable(root.Name + "###parent-" + root.Id, root == parent))
-                        { settings.Attach(selected, root.Id); root.Visible = true; changed = true; }
-                }
-                finally { ImGui.EndCombo(); }
+                settings.Attach(selected,parents[parentIndex].Id); changed=true;
             }
-            ImGui.TextWrapped("サイズ・固定・クリック透過は、所属ウィンドウの設定に従います。");
+            UiDescription("サイズ・固定・クリック透過は、所属ウィンドウの設定に従います。");
         }
         if (selected.Detached)
         {
@@ -113,7 +168,7 @@ public sealed partial class Plugin
                 View(selected.Id).RequestedSize = new(selected.Width, selected.Height);
                 windowSizeEdited = false; changed = true;
             }
-            ImGui.TextWrapped("幅250～4000px、高さ180～3000px。タイトルバー・タブを含むサイズです。位置は変わりません。");
+            UiDescription("幅250～4000px、高さ180～3000px。タイトルバー・タブを含むサイズです。位置は変わりません。");
             var visible = selected.Visible; if (UiCheckbox("このウィンドウを表示", ref visible)) { selected.Visible = visible; changed = true; }
             var pinned = selected.Pinned;
             if (UiCheckbox("このウィンドウを固定", ref pinned)) { selected.Pinned = pinned; changed = true; }

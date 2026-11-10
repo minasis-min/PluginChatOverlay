@@ -189,7 +189,11 @@ public sealed partial class Plugin
         foreach (var doc in docs)
         {
             if (!state.Rows.TryGetValue(doc.Record.Id, out var row) || !ReferenceEquals(row.Document, doc))
-            { row = new(doc); state.Rows[doc.Record.Id] = row; changed = true; }
+            {
+                if(row!=null && doc.Record.MapContext.Length>0 && row.Document.Text!=doc.Text
+                    && (state.Selection.Start?.RecordId==doc.Record.Id || state.Selection.End?.RecordId==doc.Record.Id)) state.Selection.Clear();
+                row = new(doc); state.Rows[doc.Record.Id] = row; changed = true;
+            }
             if (row.Width == width && row.FontSize == settings.FontSize && row.LineSpacing == settings.LineSpacing)
             {
                 if (row.MessageGap != spacing)
@@ -212,7 +216,7 @@ public sealed partial class Plugin
         if (changed && !state.Follow && !state.ScrollbarDragging && state.AnchorId != 0)
         {
             var before = 0f;
-            foreach (var doc in docs) { if (doc.Record.Id >= state.AnchorId) break; before += state.Rows[doc.Record.Id].Height; }
+            foreach (var doc in docs) { if (doc.Record.Id == state.AnchorId) break; before += state.Rows[doc.Record.Id].Height; }
             ImGui.SetScrollY(Math.Max(0, before + state.AnchorOffset));
         }
         var autoScroll = (state.Follow && changed) || state.Jump;
@@ -286,7 +290,7 @@ public sealed partial class Plugin
         ImGui.SetCursorPos(new(origin.X, origin.Y + y)); ImGui.Dummy(new(1, 0));
         if (autoScroll && !state.Selection.Active) ImGui.SetScrollY(Math.Max(0, y - ImGui.GetWindowHeight() + ImGui.GetStyle().WindowPadding.Y * 2));
         if (!autoScroll && !state.Selection.Active && !state.ScrollbarDragging) state.Follow = ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 3;
-        if (state.Follow) { state.ReadUpTo = docs.LastOrDefault()?.Record.Id ?? state.ReadUpTo; state.Unread = 0; }
+        if (state.Follow) { state.ReadUpTo = docs.Length > 0 ? docs.Max(d=>d.Record.Id) : state.ReadUpTo; state.Unread = 0; }
     }
     private void CaptureDrawCopyShortcut(ViewState state, bool pass)
     {

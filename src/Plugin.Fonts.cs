@@ -76,7 +76,7 @@ public sealed partial class Plugin
         ImGui.SameLine();
         var changed = UiButton("フォントを標準に戻す");
         if (changed) { settings.FontIdType = ""; settings.FontIdJson = ""; RebuildChatFont(); }
-        ImGui.TextWrapped("Dalamudのフォント選択画面で、ゲーム内・システムのフォントを選べます。日本語はプレビューで確認してください。");
+        UiDescription("Dalamudのフォント選択画面で、ゲーム内・システムのフォントを選べます。日本語はプレビューで確認してください。");
         if (fontNotice.Length > 0) ImGui.TextWrapped(fontNotice);
         return changed;
     }

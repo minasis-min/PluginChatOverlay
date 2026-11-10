@@ -1,5 +1,6 @@
 $ErrorActionPreference='Stop'
 $script:ProjectRoot=Split-Path $PSScriptRoot -Parent
+if ([IO.Path]::GetPathRoot($ProjectRoot) -ne 'D:\') { throw 'Dドライブ上で実行してください。' }
 $taskLocations=@{
   DOTNET_CLI_HOME='.work/cli'; NUGET_PACKAGES='.work/nuget/packages'
   NUGET_HTTP_CACHE_PATH='.work/nuget/http'; NUGET_PLUGINS_CACHE_PATH='.work/nuget/plugins'

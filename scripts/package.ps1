@@ -1,7 +1,9 @@
 . "$PSScriptRoot/Environment.ps1"
-& "$PSScriptRoot/build.ps1"
+& "$PSScriptRoot/build.ps1" -Distribution
 
-$taskBinary = Join-Path $ProjectRoot 'artifacts/bin/PluginChatOverlay/Release/net10.0-windows'
+$taskUiVendor = Join-Path $ProjectRoot 'vendor/MinasisUI/1.0.10'
+$taskUiOrigin = Get-Content -LiteralPath (Join-Path $taskUiVendor 'ADOPTION.json') -Raw | ConvertFrom-Json
+$taskBinary = Join-Path $ProjectRoot 'artifacts/distribution-build/bin/Release/net10.0-windows'
 $taskDll = Join-Path $taskBinary 'PluginChatOverlay.dll'
 $taskVersion = [Reflection.AssemblyName]::GetAssemblyName($taskDll).Version.ToString()
 $taskManifest = Get-Content -LiteralPath 'src/PluginChatOverlay.json' -Raw | ConvertFrom-Json -AsHashtable
@@ -20,8 +22,8 @@ try {
         throw 'Distribution must use Dalamud ConfigDirectory'
     }
     if ($taskModule.HasSymbols) { throw 'Distribution must not contain debug symbols' }
-    if (!$taskModule.Types.Where({ $_.FullName -eq 'MinasisUI.Ui' }).Count -or $taskModule.AssemblyReferences.Where({ $_.Name -eq 'MinasisUI' }).Count) {
-        throw 'MinasisUI must be source embedded'
+    if (!$taskModule.AssemblyReferences.Where({ $_.Name -eq 'MinasisUI' -and $_.Version.ToString() -eq $taskUiOrigin.AssemblyVersion }).Count) {
+        throw 'Unexpected MinasisUI assembly reference'
     }
 }
 finally { $taskModule.Dispose() }
@@ -35,7 +37,7 @@ try {
 finally { $taskPe.Dispose(); $taskPeStream.Dispose() }
 
 $taskDeps = Get-Content -LiteralPath (Join-Path $taskBinary 'PluginChatOverlay.deps.json') -Raw | ConvertFrom-Json -AsHashtable
-if (@($taskDeps.libraries.Keys).Count -ne 1 -or !($taskDeps.libraries.ContainsKey("PluginChatOverlay/$taskVersion"))) {
+if (!$taskDeps.libraries.ContainsKey("PluginChatOverlay/$taskVersion") -or !$taskDeps.libraries.ContainsKey("MinasisUI/$($taskUiOrigin.AssemblyVersion)")) {
     throw 'Unexpected dependency metadata'
 }
 $taskIcon = [IO.File]::ReadAllBytes((Join-Path $ProjectRoot 'images/icon.png'))
@@ -51,7 +53,8 @@ $taskAllowed = [ordered]@{
     'PluginChatOverlay.dll' = $taskDll
     'PluginChatOverlay.json' = Join-Path $ProjectRoot 'src/PluginChatOverlay.json'
     'PluginChatOverlay.deps.json' = Join-Path $taskBinary 'PluginChatOverlay.deps.json'
-    'images/icon.png' = Join-Path $ProjectRoot 'images/icon.png'
+    'MinasisUI.dll' = Join-Path $taskBinary 'MinasisUI.dll'
+    'LICENSE.MinasisUI' = Join-Path $taskUiVendor 'LICENSE'
     'LICENSE' = Join-Path $ProjectRoot 'LICENSE'
 }
 $taskZip = Join-Path $taskDirectory 'PluginChatOverlay.zip'
@@ -87,7 +90,7 @@ $taskEntry.CategoryTags = @('UI')
 $taskEntry.DownloadLinkInstall = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.DownloadLinkUpdate = "$taskReleaseBase/PluginChatOverlay.zip"
 $taskEntry.LastUpdate = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
-$taskEntry.Changelog = '1.0.9: ゲームログのコピー表示とタブ別フィルターを追加。チャット窓の画面外移動に対応し、ログ受信中のスクロール操作と設定画面の表記を改善。'
+$taskEntry.Changelog = '対応するプラグインのトースト通知の表示、Lifestream移動案内の分離、チャットタブの並べ替えを追加。設定画面を整理しました。'
 $taskEntry | ConvertTo-Json -Depth 16 | Set-Content -LiteralPath (Join-Path $taskDirectory 'repo-entry.json') -Encoding utf8NoBOM
 Write-Output "Verified release package: $taskZip"
 Write-Output "ZIP SHA256: $taskHash"

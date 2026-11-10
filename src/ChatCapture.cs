@@ -1,5 +1,6 @@
 using System.Reflection;
 using Dalamud.Game.Chat;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 using Dalamud.Game.Text.SeStringHandling;
 
@@ -13,6 +14,8 @@ internal sealed class ChatCapture : IDisposable
     private readonly History history;
     private readonly Func<bool> enabled;
     private readonly QueueOrigin? origin;
+    private readonly Func<ChatCallOrigin>? classifyOverride;
+    private readonly Func<DalamudLinkPayload,bool> routeLinkOwner;
     private bool disposed;
     private bool subscribed;
     public string Status { get; private set; } = "未初期化";
@@ -23,10 +26,11 @@ internal sealed class ChatCapture : IDisposable
     public long Passed { get; private set; }
     public long Failures { get; private set; }
     public long AppendedLoot { get; private set; }
+    public long AppendedRoutes { get; private set; }
 
-    public ChatCapture(IChatGui chat, IFramework framework, IPluginLog log, History history, Func<bool> enabled)
+    public ChatCapture(IChatGui chat, IFramework framework, IPluginLog log, History history, Func<bool> enabled, Func<ChatCallOrigin>? classifyOverride = null, Func<DalamudLinkPayload,bool>? routeLinkOwner = null)
     {
-        this.chat = chat; this.framework = framework; this.log = log; this.history = history; this.enabled = enabled;
+        this.chat = chat; this.framework = framework; this.log = log; this.history = history; this.enabled = enabled; this.classifyOverride=classifyOverride; this.routeLinkOwner=routeLinkOwner ?? (link=>TeleportRoute.OwnsLink(chat,link));
         try
         {
             var assembly = typeof(IChatGui).Assembly;
@@ -58,13 +62,24 @@ internal sealed class ChatCapture : IDisposable
 
     private void Check(IHandleableChatMessage message)
     {
-        if (!Compatible || origin == null || !framework.IsInFrameworkUpdateThread) return;
+        if (!Compatible || !framework.IsInFrameworkUpdateThread) return;
         try
         {
             if (!enabled()) return;
-            if (!origin.IsQueueCall()) { Passed++; CaptureLootAppend(message); return; }
+            var call=ClassifyCurrentCall();
+            if(call!=ChatCallOrigin.Plugin)
+            {
+                Passed++;
+                if(call==ChatCallOrigin.Game)
+                {
+                    var kind=(int)message.LogKind;
+                    if(PositionMessages.IsPlayerKind(kind)) CaptureTeleportRoute(message, kind);
+                    else if(kind==62) CaptureLootAppend(message);
+                }
+                return;
+            }
             QueueMatches++;
-            if (!enabled() || message.IsHandled) return;
+            if (message.IsHandled) return;
             if (!history.TryAdd(id => Copy(id, message), out var id)) { Passed++; return; }
             // Already owned, parsed and registered; this is the sole suppression point.
             try { message.PreventOriginal(); Captured++; }
@@ -72,9 +87,27 @@ internal sealed class ChatCapture : IDisposable
         }
         catch (Exception ex) { Failures++; log.Error(ex, "Chat capture failed; no new suppression requested"); }
     }
+    private void CaptureTeleportRoute(IHandleableChatMessage message, int kind)
+    {
+        if(message.IsHandled) return;
+        var changed=message.Message;
+        if(!changed.Payloads.Any(p=>p is MapLinkPayload)) return;
+        var original=message.OriginalMessage.AsSpan().Data.ToArray();
+        var modified=changed.Encode();
+        if(!TeleportRoute.TryRestore(kind,original,modified,routeLinkOwner,out var restored,out var route)) return;
+        var owner=SeString.Parse(route).Payloads.OfType<DalamudLinkPayload>().First().Plugin;
+        var start=0; while(start<route.Length && route[start] is 10 or 13) start++;
+        if(start>0) route=route[start..];
+        var plain=SeString.Parse(route).TextValue;
+        var mapContext=TeleportRoute.MapContext(original);
+        var source=(int)message.SourceKind; var target=(int)message.TargetKind; var timestamp=message.Timestamp;
+        if(!history.TryAdd(id=>new(id,kind,source,target,timestamp,[],route,plain) { PluginOwner=owner, MapContext=mapContext },out var recordId)) return;
+        try { history.RememberRoute(restored,recordId); message.Message=restored; AppendedRoutes++; }
+        catch { history.Remove(recordId); throw; }
+    }
     private void CaptureLootAppend(IHandleableChatMessage message)
     {
-        if ((int)message.LogKind != 62 || !enabled() || message.IsHandled || origin == null || !origin.IsNonRecursiveCall()) return;
+        if (message.IsHandled) return;
         var original = message.OriginalMessage.AsSpan().Data.ToArray();
         var modified = message.Message.Encode();
         if (!LootAppend.Split((int)message.LogKind, original, modified, out var addition)) return;
@@ -92,7 +125,7 @@ internal sealed class ChatCapture : IDisposable
         catch { history.Remove(recordId); throw; }
     }
 
-    internal ChatCallOrigin ClassifyCurrentCall() => Compatible ? origin!.ClassifyCurrentCall() : ChatCallOrigin.Unknown;
+    internal ChatCallOrigin ClassifyCurrentCall() => Compatible ? classifyOverride?.Invoke() ?? origin!.ClassifyCurrentCall() : ChatCallOrigin.Unknown;
 
     private static ChatRecord Copy(long id, IChatMessage message)
     {

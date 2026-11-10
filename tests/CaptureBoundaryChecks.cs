@@ -21,7 +21,7 @@ internal static class CaptureBoundaryChecks
         ((ServiceProxy)message).Result = (method, _) =>
         {
             reads++;
-            if (method.Name == "get_LogKind") return XivChatType.Say;
+            if (method.Name == "get_LogKind") return XivChatType.Echo;
             if (method.Name == "get_IsHandled") return false;
             throw new Exception("unexpected message access: " + method.Name);
         };
@@ -34,8 +34,8 @@ internal static class CaptureBoundaryChecks
         Check(reads == 0 && capture.QueueMatches == 0 && capture.Passed == 0 && allocated < 100000,
             "disabled capture skips message processing and stack-trace allocation (1000 fake-host calls)");
         enabled = true; check(message);
-        Check(capture.Passed == 1 && capture.Failures == 0 && reads == 1,
-            "ordinary non-queue chat only reads its kind and preserves vanilla output");
+        Check(capture.Passed == 1 && capture.Failures == 0 && reads == 0,
+            "unproven direct callbacks read no message and preserve vanilla output");
         var removed = new List<string>();
         ((ServiceProxy)chat).Result = (method, _) =>
         {

@@ -5,12 +5,18 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 
+if(args.Length==2 && args[0]=="--inspect") { ApiInspection.Run(args[1]); return; }
+if(args.Length==2 && args[0]=="--game-colors") { ApiInspection.GameColors(args[1]); return; }
+if(args.Length==2 && args[0]=="--plugin-colors") { ApiInspection.PluginColors(args[1]); return; }
 
 if(args.Length==1 && args[0]=="--chat-fingerprint") { var t=typeof(IChatGui).Assembly.GetType("Dalamud.Game.Gui.ChatGui")!; foreach(var name in new[]{"UpdateQueue","HandlePrintMessageDetour"}) Console.WriteLine(name+" "+MethodCompatibility.Fingerprint(t.GetMethod(name,BindingFlags.Instance|BindingFlags.NonPublic)!)); return; }
 if(args.Length==1 && args[0]=="--tooltip-contract") { Console.WriteLine(NativeTooltipCompatibility.Fingerprint()); return; }
 if(args.Length==1 && args[0]=="--tooltip-parts") { var parts=new Dictionary<string,string>(); NativeTooltipCompatibility.Fingerprint(observe:(k,v)=>parts[k]=v); Console.WriteLine(System.Text.Json.JsonSerializer.Serialize(parts)); return; }
 if(args.Length==2 && args[0]=="--native-log-data") { GameLogChecks.RunGameData(args[1]); return; }
 GameLogChecks.Run();
+PosToastChecks.Run();
+TeleportRouteChecks.Run();
+RoutePresentationChecks.Run();
 var flags=BindingFlags.Static|BindingFlags.NonPublic;
 var detour=typeof(Probe).GetMethod("Detour",flags)!;
 var update=typeof(Probe).GetMethod("UpdateQueue",flags)!;
@@ -82,6 +88,7 @@ Check(settings.BackgroundAlpha==.8f && settings.FontSize==17 && settings.History
 static void CheckQuiet(bool ok) { if(!ok) throw new Exception("unexpected rejection"); }
 
 if(args.Length>0) MetadataAudit.Run(args[0]);
+if(args.Length>1) MaskedAudit.Run(args[1]);
 
 var firstMap = new MapLinkPayload(132u,1u,1000,2000);
 var secondMap = new MapLinkPayload(132u,1u,3000,4000);

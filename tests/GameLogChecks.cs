@@ -136,7 +136,9 @@ internal static class GameLogChecks
         var calls=module.Types.Single(t=>t.FullName==typeof(GameLogCapture).FullName).Methods.Where(m=>m.HasBody)
             .SelectMany(m=>m.Body.Instructions).Select(i=>i.Operand).OfType<Mono.Cecil.MethodReference>();
         Check(!calls.Any(c=>c.Name is "PreventOriginal" or "set_Message" or "set_Sender" or "Print" or "PrintError"),
-            "native capture IL has no suppression, chat mutation or game reprint path");
+            "native capture has no suppression, chat mutation or game reprint path");
+        var writers = module.Types.Single(t=>t.FullName==typeof(GameLogCapture).FullName).Methods.Where(m=>m.HasBody && m.Body.Instructions.Any(i=>i.Operand is Mono.Cecil.MethodReference c && c.Name=="set_Message")).Select(m=>m.Name).ToArray();
+        Check(writers.Length==0, "map-statement copy never mutates the native message");
     }
     private static void TabCacheChecks(GameLogCatalog catalog)
     {
@@ -159,6 +161,15 @@ internal static class GameLogChecks
         tab.GameLogs.Rows.Clear(); Check(Filter().Length==0,"clearing native choices invalidates cached rows");
         var gameDocument=docs[1]; gameDocument.CacheText();
         Check(gameDocument.Text=="a", "preformatted native record is rendered once without plugin tag, sender or duplicate color prefix");
+        var mapBody=new SeStringBuilder().AddText("元の発言").Add(new MapLinkPayload(1,1,100,200)).Build().Encode();
+        docs=[new DisplayDocument(new(3,10,0,0,0,[],mapBody,"map"){Origin=ChatRecordOrigin.Game},"",new(){ShowTime=false},palette,0),
+            new DisplayDocument(new(4,10,0,0,0,[],[(byte)'r'],"route"){PluginOwner="AetheryteLinkInChat"},"AetheryteLinkInChat",new(){ShowTime=false},palette,0)];
+        tab.IncludeAll=true; tab.GameLogs.Enabled=false; tab.GameLogs.ShowMapMessages=false;
+        Check(Filter().Length==1 && Filter()[0].Record.Origin==ChatRecordOrigin.Plugin,"route notifications display with regular game and map statements disabled");
+        tab.GameLogs.ShowMapMessages=true;
+        Check(Filter().Length==2,"map checkbox independently adds player speech without enabling game categories");
+        tab.IncludeAll=false;
+        Check(Filter().Length==1 && Filter()[0].Record.Origin==ChatRecordOrigin.Game,"plugin notification filters and map-message visibility stay independent");
     }
     public static void RunGameData(string directory)
     {

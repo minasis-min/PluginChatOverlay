@@ -8,7 +8,7 @@ public sealed partial class Plugin
     {
         public readonly Dictionary<long, RowLayout> Rows = [];
         public readonly TextSelection Selection = new();
-        public bool Follow = true, Jump, ResetGeometry = true, HeaderDragging, AltDragging;
+        public bool Follow = true, Jump, ResetGeometry = true, HeaderDragging, AltDragging, ResetTabOrder = true;
         public long ReadUpTo, AnchorId;
         public float AnchorOffset;
         public int Unread;
@@ -30,7 +30,7 @@ public sealed partial class Plugin
         public DisplayDocument[]? FilterSource, UnreadDocuments;
         public DisplayDocument[] FilteredDocuments = [];
         public string[] FilterPlugins = [];
-        public bool FilterAll, FilterUnknown, FilterGameEnabled;
+        public bool FilterAll, FilterUnknown, FilterGameEnabled, FilterMapMessages;
         public uint[] FilterGameRows = [];
         public long UnreadReadUpTo;
         public WindowRect? Window;

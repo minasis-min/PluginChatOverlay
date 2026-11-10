@@ -35,17 +35,18 @@ public sealed partial class Plugin
         var state = View(tab.Id);
         var sameRules = state.FilterAll == tab.IncludeAll && state.FilterUnknown == tab.IncludeUnknown
             && state.FilterPlugins.SequenceEqual(tab.Plugins)
-            && state.FilterGameEnabled == tab.GameLogs.Enabled && tab.GameLogs.Rows.SetEquals(state.FilterGameRows);
+            && state.FilterGameEnabled == tab.GameLogs.Enabled && state.FilterMapMessages == tab.GameLogs.ShowMapMessages && tab.GameLogs.Rows.SetEquals(state.FilterGameRows);
         if (!ReferenceEquals(state.FilterSource, docs) || !sameRules)
         {
             state.FilterSource = docs; state.FilterAll = tab.IncludeAll; state.FilterUnknown = tab.IncludeUnknown;
             if (!sameRules)
             {
                 state.FilterPlugins = tab.Plugins.ToArray();
-                state.FilterGameEnabled = tab.GameLogs.Enabled; state.FilterGameRows = tab.GameLogs.Rows.ToArray();
+                state.FilterGameEnabled = tab.GameLogs.Enabled; state.FilterMapMessages = tab.GameLogs.ShowMapMessages; state.FilterGameRows = tab.GameLogs.Rows.ToArray();
             }
-            state.FilteredDocuments = docs.Where(d => d.Record.Origin == ChatRecordOrigin.Game
-                ? gameLogCatalog.Matches(tab.GameLogs, d.Record.Kind, d.Record.Source, d.Record.Target) : tab.Matches(d.Plugin)).ToArray();
+            var filtered = docs.Where(d => d.Record.Origin == ChatRecordOrigin.Game
+                ? gameLogCatalog.MatchesMessage(tab.GameLogs, d.Record.Kind, d.Record.Source, d.Record.Target,d.Record.Body) : tab.Matches(d.Plugin)).ToArray();
+            state.FilteredDocuments = RoutePresentation.Arrange(filtered,settings,palette);
         }
         return state.FilteredDocuments;
     }
@@ -140,7 +141,20 @@ public sealed partial class Plugin
         ImGui.BeginDisabled(AltMoveActive(windowId));
         try
         {
-            if (ImGui.BeginTabBar(label)) return true;
+            if (ImGui.BeginTabBar(label))
+            {
+                var state=View(windowId);
+                if(state.ResetTabOrder)
+                {
+                    // Discard only ImGui's cached headers, then submit them in the
+                    // saved order. Model tabs and the selected stable ID stay intact.
+                    var prefix=windowId=="main" ? "###tab-" : "###detached-";
+                    foreach(var tab in settings.WindowTabs(windowId)) ImGui.SetTabItemClosed(prefix+tab.Id);
+                    state.ResetTabOrder=false;
+                    if(state.ActiveTabId.Length>0) state.RequestedTabId=state.ActiveTabId;
+                }
+                return true;
+            }
         }
         catch { ImGui.EndDisabled(); throw; }
         ImGui.EndDisabled();

@@ -7,12 +7,13 @@ namespace PluginChatOverlay;
 
 public sealed partial class Plugin
 {
-    private static readonly string[] LayoutPages = ["背景・外枠", "スクロールバー", "文字・フォント", "リンク・時刻", "チャット横ボタン"];
+    private static readonly string[] LayoutPages = ["外観", "スクロールバー", "文字・フォント", "リンク・時刻", "チャット横ボタン", "トースト通知"];
     private static readonly string LayoutResetIcon = FontAwesomeIcon.Undo.ToIconString();
 
     private bool DrawLayoutSettings()
     {
-        var changed = DrawAppearanceModeSettings();
+        var changed = false;
+        if (minasisFrame) return changed | (workspace.Tab == 5 ? DrawLayoutResetSettings() : DrawLayoutPage(workspace.Tab));
         if (!ImGui.BeginTabBar("DetailedLayoutTabs")) return changed;
         try
         {
@@ -45,31 +46,19 @@ public sealed partial class Plugin
             fontChooser?.Dispose(); fontChooser = null;
             RebuildChatFont();
         }
-        ImGui.TextWrapped(settings.IsCustomAppearance
+        UiDescription(settings.IsCustomAppearance
             ? "編集値を適用し、UI切替でも外観を保持します。"
             : "選択中のUIの標準スタイルを使用します。");
-        ImGui.TextWrapped("切り替えても編集値は保持されます。");
+        UiDescription("切り替えても編集値は保持されます。");
         return changed;
     }
     private void DrawCustomAppearanceNotice()
     {
         if (!settings.IsCustomAppearance)
-            ImGui.TextWrapped("カスタム時のみ編集・適用できます。編集値は保持されます。");
+            UiDescription("カスタム時のみ編集・適用できます。編集値は保持されます。");
     }
-    private bool AppearanceDropdown(string id, string label, ref int selected, MinasisUI.UiChoice[] choices)
-    {
-        ImGui.SetNextItemWidth(280 * ImGuiHelpers.GlobalScale);
-        if (minasisFrame) return ui.Dropdown(id, label, ref selected, choices);
-        if (!ImGui.BeginCombo(label + "###" + id, choices[selected].Label)) return false;
-        var changed = false;
-        try
-        {
-            for (var i = 0; i < choices.Length; i++)
-                if (ImGui.Selectable(choices[i].Label, selected == i)) { selected = i; changed = true; }
-        }
-        finally { ImGui.EndCombo(); }
-        return changed;
-    }
+    private bool AppearanceDropdown(string id,string label,ref int selected,MinasisUI.UiChoice[] choices)
+        => UiDropdown(id,label,ref selected,choices,280 * ImGuiHelpers.GlobalScale);
 
     private bool DrawLayoutPage(int page)
     {
@@ -79,11 +68,13 @@ public sealed partial class Plugin
             if (!body) return false;
             return page switch
             {
-                0 => DrawDetailedWindowAppearance(),
+                0 => SettingsCard("appearance-mode", DrawAppearanceModeSettings) | DrawDetailedWindowAppearance(),
                 1 => DrawCustomScrollbarSettings(),
                 2 => DrawChatTextSettings(),
-                3 => DrawChatLinkSettings(),
-                _ => DrawNativeButtonSettings(),
+                3 => DrawChatLinkSettings() | (minasisFrame && DrawNativeButtonSettings()),
+                4 => minasisFrame ? DrawPluginToastSettings() : DrawNativeButtonSettings(),
+                5 => DrawPluginToastSettings(),
+                _ => false,
             };
         }
         finally { ImGui.EndChild(); }
@@ -123,17 +114,15 @@ public sealed partial class Plugin
             if (!body) return false;
             var io = ImGui.GetIO();
             var changed = false;
-            ImGui.BeginDisabled(!io.KeyCtrl || !io.KeyShift);
-            try
+            if (minasisFrame)
             {
-                if (UiButton("レイアウトリセット") && io.KeyCtrl && io.KeyShift)
-                {
-                    ResetLayoutSettings();
-                    changed = true;
-                }
+                if (workspace.Flow.GuardedResetButton("layout-reset", "レイアウトリセット")) { ResetLayoutSettings(); changed = true; }
             }
-            finally { ImGui.EndDisabled(); }
-            ImGui.TextWrapped("全てのレイアウト設定を既定に戻します。Ctrl＋Shiftを押しながらボタンをクリックしてください。");
+            else
+            {
+                if (UiButton("レイアウトリセット") && io.KeyCtrl && io.KeyShift) { ResetLayoutSettings(); changed = true; }
+                UiTooltip("Ctrl＋Shiftを押しながらクリック");
+            }
             return changed;
         }
         finally { ImGui.EndChild(); }

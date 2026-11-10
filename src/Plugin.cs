@@ -47,7 +47,7 @@ public sealed partial class Plugin : IDalamudPlugin
 
     public Plugin(IDalamudPluginInterface pi, ICommandManager commands, IChatGui chat,
         IFramework framework, IGameGui game, IDataManager data, IKeyState keyState, IClientState clientState, IPluginLog log,
-        IAddonLifecycle addonLifecycle, IGameConfig gameConfig, ISeStringEvaluator seStringEvaluator)
+        IAddonLifecycle addonLifecycle, IGameConfig gameConfig, ISeStringEvaluator seStringEvaluator, ITextureProvider textures, IToastGui toast)
     {
         this.pi = pi; this.commands = commands; this.chat = chat; this.log = log;
         this.framework = framework; this.keyState = keyState;
@@ -60,6 +60,7 @@ public sealed partial class Plugin : IDalamudPlugin
 #endif
         try { settings = store.Load(); }
         catch (Exception ex) { settings = new(); saveNotice = "設定読込失敗。既定値で起動しました。"; log.Error(ex, "Settings load failed"); }
+        workspace = CreateWorkspace(settings.WorkspacePreferences); ui = workspace.Controls;
         history.ApplyLimit(settings.HistoryLimit);
         history.ApplyGameLimit(settings.GameHistoryLimit);
         gameLogCatalog = GameLogCatalog.Load(data, log);
@@ -68,17 +69,19 @@ public sealed partial class Plugin : IDalamudPlugin
         palette = new(data, log);
         try
         {
+            InitializeWorkspace();
             headingFonts = new(pi.UiBuilder.FontAtlas);
             headingFonts.Apply(ui);
             ApplyUiVisibility();
             RebuildChatFont();
-            commandRegistered = commands.AddHandler(Command, new CommandInfo(OnCommand) { HelpMessage = "Plugin Chat Overlay: show / config / on / off / reset / test" });
+            commandRegistered = commands.AddHandler(Command, new CommandInfo(OnCommand) { HelpMessage = "Plugin Chat Overlay: show / config / on / off / reset / test / toasttest / toast on|off|status" });
             if (!commandRegistered) throw new InvalidOperationException(Command + " は既に使用されています。");
             capture = new(chat, framework, log, history, () => settings.Enabled && !uiFault);
             var gameFormatter = new GameLogFormatter(data, seStringEvaluator);
             gameCapture = new(chat, framework, log, history,
-                () => settings.CopyGameLogs && gameLogCatalog.Available && capture.Compatible && !uiFault,
-                capture.ClassifyCurrentCall, WantsGameLog, gameFormatter.Format);
+                () => gameCopySelection.HasSelection && capture.Compatible && !uiFault,
+                capture.ClassifyCurrentCall, WantsGameLog, gameFormatter.Format, (kind, source, target, body) => gameCopySelection.MatchesBody(kind, source, target, body));
+            InitializePluginToasts(textures, toast);
             links.InitializeTooltips(addonLifecycle, gameConfig);
             pi.UiBuilder.Draw += Draw;
             pi.UiBuilder.HideUi += StopWindowDrags;
@@ -103,7 +106,7 @@ public sealed partial class Plugin : IDalamudPlugin
     private void OpenConfig() => configOpen = true;
     private void StopWindowDrags()
     {
-        try { links.CloseTooltip(); }
+        try { StopPluginToasts(); links.CloseTooltip(); }
         finally
         {
             foreach (var view in views.Values) { view.HeaderDragging = view.AltDragging = view.ScrollbarDragging = view.ScrollbarHovered = false; view.PendingAltFrame = -1; view.Selection.EndDrag(); }
@@ -120,7 +123,10 @@ public sealed partial class Plugin : IDalamudPlugin
     }
     private void Draw()
     {
-        lock (renderCacheGate) DrawCore();
+        lock (renderCacheGate)
+        {
+            if (workspaceFonts != null) workspaceFonts.Draw([workspace], DrawCore); else DrawCore();
+        }
     }
     private void DrawCore()
     {
@@ -142,6 +148,7 @@ public sealed partial class Plugin : IDalamudPlugin
             if (!chatHiddenByNativeExpansion) DrawNativeChatButtons();
             using (chatFont?.Push())
                 if (!chatHiddenByNativeExpansion && !uiFault && settings.Visible && (!settings.HideLoggedOut || clientState.IsLoggedIn) && (!settings.HideDuringCutscene || !pi.UiBuilder.CutsceneActive)) DrawChatWindows();
+            DrawPluginToasts();
             if (configOpen) DrawConfig();
             CompleteCopyRequest();
             if (geometryDirtyAt != 0 && Environment.TickCount64 - geometryDirtyAt > 650 && !ImGui.IsMouseDown(ImGuiMouseButton.Left))
@@ -161,7 +168,7 @@ public sealed partial class Plugin : IDalamudPlugin
             links.EndTooltipFrame();
         }
     }
-    private void UpdateGameLogSelection() => gameCopySelection = gameLogCatalog.BuildSelection(settings.Tabs.Select(t => t.GameLogs));
+    private void UpdateGameLogSelection() => gameCopySelection = gameLogCatalog.BuildSelection(settings.Tabs.Select(t => t.GameLogs), settings.CopyGameLogs);
     private bool WantsGameLog(int kind, int source, int target) => gameCopySelection.Matches(kind, source, target);
     private string Plain(ChatRecord record) => (settings.ShowTime ? ChatClock.Format(record, settings.EffectivePadTimestampHour) + " " : "") + record.Plain;
     public void Dispose()
@@ -179,13 +186,18 @@ public sealed partial class Plugin : IDalamudPlugin
             () => pi.UiBuilder.OpenMainUi -= OpenMain,
             () => pi.UiBuilder.HideUi -= StopWindowDrags,
             () => pi.ActivePluginsChanged -= PluginsChanged,
+            () => toastCapture?.Dispose(),
+            () => StopPluginToasts(),
             () => gameCapture?.Dispose(),
             () => capture?.Dispose(),
             () => links.DisposeTooltips(),
             () => fontChooser?.Dispose(),
+            () => toastFont?.Dispose(),
             () => chatFont?.Dispose(),
             () => fontAtlas?.Dispose(),
-            () => ui.Dispose(),
+            () => settingsWindows.RemoveAllWindows(),
+            () => workspace.Dispose(),
+            () => workspaceFonts?.Dispose(),
             () => headingFonts?.Dispose(),
             () => { if (commandRegistered) { commands.RemoveHandler(Command); commandRegistered = false; } },
             () => { if (testLinkActive) chat.RemoveChatLinkHandler(701); },

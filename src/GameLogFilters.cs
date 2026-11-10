@@ -49,11 +49,14 @@ internal sealed class GameLogCatalog
     // These two kinds share one checkbox in the native filter UI.
     public static int CanonicalKind(int kind) => kind switch { 13 => 12, 32 => 14, _ => kind };
     public GameLogFilterEntry[] Category(int category) => byCategory.GetValueOrDefault(category) ?? [];
-    public GameLogSelection BuildSelection(IEnumerable<GameLogFilter> filters)
+    public GameLogSelection BuildSelection(IEnumerable<GameLogFilter> filters, bool includeRegularRows = true)
     {
-        var selected = filters.Where(f => f.Enabled).SelectMany(f => f.Rows).ToHashSet();
-        return new GameLogSelection(Entries.Where(e => selected.Contains(e.Id)));
+        var snapshot=filters.ToArray();
+        var selected = snapshot.Where(f => includeRegularRows && f.Enabled).SelectMany(f => f.Rows).ToHashSet();
+        return new GameLogSelection(Entries.Where(e => selected.Contains(e.Id)), snapshot.Any(f => f.ShowMapMessages));
     }
+    public bool MatchesMessage(GameLogFilter filter,int kind,int source,int target,byte[] body) =>
+        Matches(filter,kind,source,target) || filter.ShowMapMessages && PositionMessages.IsPlayerKind(kind) && PositionMessages.HasMapLink(body);
     public bool Matches(GameLogFilter filter, int kind, int source, int target)
     {
         if (!filter.Enabled || filter.Rows.Count == 0 || !byKind.TryGetValue(CanonicalKind(kind), out var candidates)) return false;
@@ -66,17 +69,26 @@ internal sealed class GameLogCatalog
 internal sealed class GameLogFilter
 {
     public bool Enabled { get; set; }
+    // Retain the previous serialized key when migrating the now additive option.
+    [System.Text.Json.Serialization.JsonPropertyName("PositionsOnly")]
+    public bool ShowMapMessages { get; set; }
     public HashSet<uint> Rows { get; set; } = [];
     public void Normalize() => Rows = (Rows ?? []).Where(id => id is > 0 and <= ushort.MaxValue).Take(512).ToHashSet();
 }
 
 /// <summary>Immutable receive-side plan, rebuilt only when settings change, never enumerating mutable UI collections.</summary>
-internal sealed class GameLogSelection(IEnumerable<GameLogFilterEntry> entries)
+internal sealed class GameLogSelection(IEnumerable<GameLogFilterEntry> entries, bool showMapMessages = false)
 {
     public static readonly GameLogSelection Empty = new([]);
     private readonly Dictionary<int, GameLogFilterEntry[]> byKind = entries.GroupBy(e => e.Kind).ToDictionary(g => g.Key, g => g.ToArray());
-    public bool HasSelection => byKind.Count > 0;
-    public bool Matches(int kind, int source, int target)
+    public bool ShowMapMessages { get; } = showMapMessages;
+    public bool HasSelection => byKind.Count > 0 || ShowMapMessages;
+    public bool MatchesBody(int kind, int source, int target, byte[] body) =>
+        MatchesRegular(kind, source, target) || ShowMapMessages && PositionMessages.IsPlayerKind(kind) && PositionMessages.HasMapLink(body);
+    public bool Matches(int kind, int source, int target) =>
+        ShowMapMessages && PositionMessages.IsPlayerKind(kind) || MatchesRegular(kind, source, target);
+
+    private bool MatchesRegular(int kind, int source, int target)
     {
         if (!byKind.TryGetValue(GameLogCatalog.CanonicalKind(kind), out var candidates)) return false;
         foreach (var entry in candidates) if (entry.Matches(kind, source, target)) return true;

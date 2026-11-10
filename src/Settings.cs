@@ -24,6 +24,11 @@ internal sealed class Settings
     [JsonIgnore] public bool DarkenBackground => IsCustomAppearance && BackgroundMode == ChatBackgroundMode.Darken;
     public bool Enabled { get; set; } // Initial opt-in for this unverified development build.
     public bool CopyGameLogs { get; set; }
+    public bool SeparatePluginToasts { get; set; }
+    internal const uint DefaultToastBackgroundColor = 0x73996600;
+    public int ToastFontSize { get; set; } = 32;
+    public uint ToastBackgroundColor { get; set; } = DefaultToastBackgroundColor;
+    public MinasisUI.Workspace.WorkspacePreferences WorkspacePreferences { get; set; } = new();
     public bool Visible { get; set; } = true;
     public bool MainWindowVisible { get; set; } = true;
     public float ConfigWidth { get; set; } = DefaultConfigWidth;
@@ -170,6 +175,7 @@ internal sealed class Settings
         ConfigWidth = float.IsFinite(ConfigWidth) ? Math.Clamp(ConfigWidth, 400, 8000) : DefaultConfigWidth;
         ConfigHeight = float.IsFinite(ConfigHeight) ? Math.Clamp(ConfigHeight, 300, 8000) : DefaultConfigHeight;
         BackgroundAlpha = float.IsFinite(BackgroundAlpha) ? Math.Clamp(BackgroundAlpha, 0, 1) : .8f;
+        ToastFontSize = Math.Clamp(ToastFontSize, 16, 48);
         FontSize = float.IsFinite(FontSize) ? Math.Clamp(MathF.Round(FontSize), 10, 36) : 17;
         NormalizeLineSpacing();
         if (CustomChatStyle != null && !CustomChatStyle.IsValid) CustomChatStyle = null;
@@ -209,6 +215,7 @@ internal sealed class Settings
             tab.Plugins ??= []; tab.Plugins = tab.Plugins.Where(p => !string.IsNullOrWhiteSpace(p)).Distinct().Take(256).ToList();
             tab.GameLogs ??= new(); tab.GameLogs.Normalize();
             tab.ParentWindowId ??= "";
+            if(tab.DisplayOrder is { } order) tab.DisplayOrder=Math.Clamp(order,0,7);
             tab.X = float.IsFinite(tab.X) ? tab.X : 160; tab.Y = float.IsFinite(tab.Y) ? tab.Y : 160;
             tab.Width = float.IsFinite(tab.Width) ? Math.Clamp(tab.Width, 250, 4000) : 600;
             tab.Height = float.IsFinite(tab.Height) ? Math.Clamp(tab.Height, 180, 3000) : 350;
@@ -221,7 +228,7 @@ internal sealed class Settings
     }
     public IEnumerable<ChatTab> WindowTabs(string windowId) => Tabs.Where(t =>
         windowId == "main" ? !t.Detached && t.ParentWindowId.Length == 0 :
-        t.Detached && t.Id == windowId || !t.Detached && t.ParentWindowId == windowId);
+        t.Detached && t.Id == windowId || !t.Detached && t.ParentWindowId == windowId).OrderBy(t=>t.DisplayOrder ?? int.MaxValue);
     public string WindowOf(ChatTab tab) => tab.Detached ? tab.Id : tab.ParentWindowId.Length > 0 ? tab.ParentWindowId : "main";
     public bool IsWindowVisible(string id) => Visible && (id == "main"
         ? MainWindowVisible && WindowTabs("main").Any()
@@ -255,9 +262,21 @@ internal sealed class Settings
         else MainWindowVisible = true;
         foreach (var child in Tabs.Where(t => !t.Detached && t.ParentWindowId == tab.Id))
             child.ParentWindowId = destination == "main" ? "" : destination;
-        tab.Detached = false; tab.ParentWindowId = destination == "main" ? "" : destination;
+        tab.Detached = false; tab.ParentWindowId = destination == "main" ? "" : destination; tab.DisplayOrder=null;
     }
     public void NormalizeLineSpacing() => LineSpacing = Math.Clamp(LineSpacing, MinimumLineSpacing, 24);
+    public bool MoveTab(string id,int direction)
+    {
+        if(direction is not (-1 or 1)) return false;
+        var tab=Tabs.FirstOrDefault(t=>t.Id==id);
+        if(tab==null) return false;
+        var siblings=WindowTabs(WindowOf(tab)).ToArray();
+        var position=Array.IndexOf(siblings,tab); var destination=position+direction;
+        if(position<0 || destination<0 || destination>=siblings.Length) return false;
+        for(var i=0;i<siblings.Length;i++) siblings[i].DisplayOrder=i;
+        (siblings[position].DisplayOrder,siblings[destination].DisplayOrder)=(siblings[destination].DisplayOrder,siblings[position].DisplayOrder);
+        return true;
+    }
     public void RemoveTab(ChatTab tab)
     {
         var children = Tabs.Where(t => !t.Detached && t.ParentWindowId == tab.Id).ToArray();
@@ -282,6 +301,7 @@ internal sealed class ChatTab
     public GameLogFilter GameLogs { get; set; } = new();
     public bool Detached { get; set; }
     public string ParentWindowId { get; set; } = "";
+    public int? DisplayOrder { get; set; }
     public bool Visible { get; set; } = true;
     public bool ClickThrough { get; set; }
     public bool Pinned { get; set; }

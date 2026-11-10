@@ -13,9 +13,6 @@ internal sealed class QueueOrigin(MethodBase detour, MethodBase update)
     public bool IsQueueCall() => ClassifyFrames(new StackTrace(false).GetFrames(), static f => f.GetMethod()) == ChatCallOrigin.Plugin;
 
     [MethodImpl(MethodImplOptions.NoInlining)]
-    public bool IsNonRecursiveCall() => FindDetour(new StackTrace(false).GetFrames(), static f => f.GetMethod()) >= 0;
-
-    [MethodImpl(MethodImplOptions.NoInlining)]
     public ChatCallOrigin ClassifyCurrentCall() => ClassifyFrames(new StackTrace(false).GetFrames(), static f => f.GetMethod());
 
     public ChatCallOrigin Classify(IReadOnlyList<MethodBase?> frames) => ClassifyFrames(frames, static f => f);

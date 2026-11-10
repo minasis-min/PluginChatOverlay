@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+using Dalamud.Game.Text.SeStringHandling;
 namespace PluginChatOverlay;
 
 internal enum ChatRecordOrigin { Plugin, Game }
@@ -5,8 +7,11 @@ internal enum ChatRecordOrigin { Plugin, Game }
 internal sealed record ChatRecord(long Id, int Kind, int Source, int Target, int Timestamp,
     byte[] Sender, byte[] Body, string Plain)
 {
-    public int Bytes => Sender.Length + Body.Length;
+    public int Bytes => Sender.Length + Body.Length + MapContext.Length;
     public ChatRecordOrigin Origin { get; init; }
+    public string PluginOwner { get; init; } = "";
+    public byte[] MapContext { get; init; } = [];
+    public long RelatedRouteId { get; init; }
     public DateTimeOffset ReceivedAt { get; init; } = DateTimeOffset.Now;
 }
 
@@ -21,6 +26,8 @@ internal sealed class History
     private readonly LinkedList<Entry> records = new();
     private readonly Dictionary<long, Entry> index = [];
     private readonly Bucket plugins = new(), game = new();
+    private sealed record RouteReference(long Id);
+    private readonly ConditionalWeakTable<SeString,RouteReference> routeMessages = new();
     private long sequence;
     private ChatRecord[]? cachedSnapshot;
     private long removalRevision;
@@ -53,6 +60,11 @@ internal sealed class History
             id = ++sequence; cachedSnapshot = null; Trim(); return true;
         }
     }
+    internal void RememberRoute(SeString restored,long routeId) => routeMessages.Add(restored,new(routeId));
+    internal long RouteOf(SeString message)
+    {
+        lock(gate) return routeMessages.TryGetValue(message,out var route) && index.ContainsKey(route.Id) ? route.Id : 0;
+    }
     public void Remove(long id)
     {
         lock (gate) if (index.TryGetValue(id, out var entry)) Remove(entry);
@@ -70,6 +82,7 @@ internal sealed class History
     {
         lock (gate)
         {
+            routeMessages.Clear();
             records.Clear(); index.Clear(); plugins.Records.Clear(); game.Records.Clear();
             plugins.Bytes = game.Bytes = 0; cachedSnapshot = null; removalRevision++;
         }
